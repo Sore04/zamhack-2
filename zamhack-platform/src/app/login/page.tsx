@@ -2,8 +2,10 @@
 
 import { useState } from "react"
 import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { login } from "./actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,35 +28,20 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>
 
 const LoginPage = () => {
-  const [error, setError] = useState<string | null>(null)
+  const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [validationErrors, setValidationErrors] = useState<
-    Partial<Record<keyof LoginFormValues, string>>
-  >({})
+  const router = useRouter()
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormValues>()
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+  })
 
   const onSubmit = async (data: LoginFormValues) => {
-    setError(null)
-    setValidationErrors({})
-
-    // Validate with zod
-    const validationResult = loginSchema.safeParse(data)
-    if (!validationResult.success) {
-      const fieldErrors: Partial<Record<keyof LoginFormValues, string>> = {}
-      validationResult.error.errors.forEach((err) => {
-        if (err.path[0]) {
-          fieldErrors[err.path[0] as keyof LoginFormValues] = err.message
-        }
-      })
-      setValidationErrors(fieldErrors)
-      return
-    }
-
+    setServerError(null)
     setIsSubmitting(true)
 
     try {
@@ -65,17 +52,22 @@ const LoginPage = () => {
       const result = await login(formData)
 
       if (result?.error) {
-        setError(result.error)
-        setIsSubmitting(false)
+        setServerError(result.error)
+      } else if (result?.success) {
+        // Redirect to dashboard on success. 
+        // Middleware will intercept this and move Companies/Admins to their correct pages.
+        router.push("/dashboard")
+        router.refresh()
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
+      setServerError("An unexpected error occurred. Please try again.")
+    } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-black">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Login</CardTitle>
@@ -85,9 +77,9 @@ const LoginPage = () => {
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="space-y-4">
-            {error && (
+            {serverError && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{serverError}</AlertDescription>
               </Alert>
             )}
             <div className="space-y-2">
@@ -99,9 +91,9 @@ const LoginPage = () => {
                 {...register("email")}
                 disabled={isSubmitting}
               />
-              {(errors.email || validationErrors.email) && (
-                <p className="text-sm text-destructive">
-                  {errors.email?.message || validationErrors.email}
+              {errors.email && (
+                <p className="text-sm text-red-500 font-medium">
+                  {errors.email.message}
                 </p>
               )}
             </div>
@@ -114,27 +106,20 @@ const LoginPage = () => {
                 {...register("password")}
                 disabled={isSubmitting}
               />
-              {(errors.password || validationErrors.password) && (
-                <p className="text-sm text-destructive">
-                  {errors.password?.message || validationErrors.password}
+              {errors.password && (
+                <p className="text-sm text-red-500 font-medium">
+                  {errors.password.message}
                 </p>
               )}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Logging in..." : "Login"}
             </Button>
             <div className="text-center text-sm">
-              <span className="text-muted-foreground">Don't have an account? </span>
-              <Link
-                href="/signup"
-                className="text-primary underline-offset-4 hover:underline"
-              >
+              <span className="text-zinc-500">Don't have an account? </span>
+              <Link href="/signup" className="text-primary underline-offset-4 hover:underline font-medium">
                 Sign up
               </Link>
             </div>
@@ -146,4 +131,3 @@ const LoginPage = () => {
 }
 
 export default LoginPage
-

@@ -30,89 +30,67 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session if expired - required for Server Components
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
-  // Define protected routes
   const protectedRoutes = ["/dashboard", "/company", "/admin"];
   const isProtectedRoute = protectedRoutes.some((route) =>
     pathname.startsWith(route)
   );
 
-  // Define public routes that should redirect if logged in
   const publicRoutes = ["/login", "/signup"];
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
-  // If user is not logged in and trying to access protected route
+  // 1. Redirect unauthenticated users to login
   if (!user && isProtectedRoute) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // If user is logged in
+  // 2. Logic for authenticated users
   if (user) {
-    // Fetch user profile to get role
+    // Fetch role if we are routing
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
-
+    
     const role = profile?.role;
 
-    // If on public route (login/signup), redirect to appropriate dashboard
+    // A. If on Login/Signup -> Go to correct Dashboard
     if (isPublicRoute) {
-      if (role === "student") {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
-      } else if (role === "company_admin" || role === "company_member") {
-        return NextResponse.redirect(new URL("/company/dashboard", request.url));
-      } else if (role === "admin") {
-        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
-      }
-      // If no role, redirect to dashboard as default
+      if (role === "admin") return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+      if (role === "company_admin" || role === "company_member") return NextResponse.redirect(new URL("/company/dashboard", request.url));
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
-    // Role-based route protection - only redirect if user is on wrong route
+    // B. Protection Logic: Prevent users from accessing wrong dashboards
     if (pathname.startsWith("/dashboard")) {
-      // Only students should access /dashboard
-      if (role && role !== "student") {
-        if (role === "company_admin" || role === "company_member") {
-          return NextResponse.redirect(
-            new URL("/company/dashboard", request.url)
-          );
-        } else if (role === "admin") {
-          return NextResponse.redirect(new URL("/admin/dashboard", request.url));
-        }
+      // If Admin tries to access Student Dashboard -> Send to Admin
+      if (role === "admin") {
+        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       }
-    } else if (pathname.startsWith("/company")) {
-      // Only company_admin and company_member should access /company
-      if (role && role !== "company_admin" && role !== "company_member") {
-        if (role === "student") {
-          return NextResponse.redirect(new URL("/dashboard", request.url));
-        } else if (role === "admin") {
-          return NextResponse.redirect(new URL("/admin/dashboard", request.url));
-        }
-        // If no role, redirect to dashboard
+      // If Company tries to access Student Dashboard -> Send to Company
+      if (role === "company_admin" || role === "company_member") {
+        return NextResponse.redirect(new URL("/company/dashboard", request.url));
+      }
+    } 
+    
+    else if (pathname.startsWith("/company")) {
+      if (role !== "company_admin" && role !== "company_member") {
+        // Send back to their home
+        if (role === "admin") return NextResponse.redirect(new URL("/admin/dashboard", request.url));
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
-    } else if (pathname.startsWith("/admin")) {
-      // Only admin should access /admin
-      if (role && role !== "admin") {
-        if (role === "student") {
-          return NextResponse.redirect(new URL("/dashboard", request.url));
-        } else if (role === "company_admin" || role === "company_member") {
-          return NextResponse.redirect(
-            new URL("/company/dashboard", request.url)
-          );
-        }
-        // If no role, redirect to dashboard
+    } 
+    
+    else if (pathname.startsWith("/admin")) {
+      if (role !== "admin") {
+        // Send back to their home
+        if (role === "company_admin" || role === "company_member") return NextResponse.redirect(new URL("/company/dashboard", request.url));
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     }
@@ -123,14 +101,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
-

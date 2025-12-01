@@ -3,14 +3,22 @@
 import { useState } from "react"
 import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { logout } from "@/app/logout/actions"
+// FIX: Import 'signOut' instead of 'logout'
+import { signOut } from "@/app/logout/actions"
 
 export const LogoutButton = () => {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleLogout = async () => {
     setIsLoading(true)
-    await logout()
+    try {
+      // FIX: Call 'signOut' here
+      await signOut()
+    } catch (error) {
+      console.error("Logout failed", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -21,9 +29,7 @@ export const LogoutButton = () => {
       disabled={isLoading}
     >
       <LogOut className="h-4 w-4" />
-      {isLoading ? "Logging out..." : "Logout"}
+      <span>{isLoading ? "Logging out..." : "Log out"}</span>
     </Button>
   )
 }
-
-
