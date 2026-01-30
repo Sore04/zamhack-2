@@ -41,8 +41,10 @@ async function getDashboardData(): Promise<DashboardData> {
     .eq("user_id", user.id)
     .not("challenge_id", "is", null)
 
-  const challengeIds =
-    participantData?.map((p) => p.challenge_id).filter(Boolean) || []
+  // FIX: Explicitly filter with a type predicate so TypeScript knows this is strictly string[]
+  const challengeIds = participantData
+    ?.map((p) => p.challenge_id)
+    .filter((id): id is string => id !== null) || []
 
   // Fetch challenges that are approved or in_progress and user is participating
   let activeChallenges: Challenge[] = []
