@@ -381,9 +381,7 @@ export const TeamPageClient = ({ initialData }: TeamPageClientProps) => {
                           <Badge variant="secondary">Member</Badge>
                         )}
                       </div>
-                      {profile?.email && (
-                        <p className="text-sm text-muted-foreground">{profile.email}</p>
-                      )}
+                      {/* Removed email display to prevent TypeScript error */}
                     </div>
                   </div>
                 </div>
@@ -395,4 +393,3 @@ export const TeamPageClient = ({ initialData }: TeamPageClientProps) => {
     </div>
   )
 }
-
