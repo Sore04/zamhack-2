@@ -29,15 +29,20 @@ export async function updateProfile(formData: FormData) {
   const linkedinUrl = formData.get("linkedin_url") as string | null
   const resumeLink = formData.get("resume_link") as string | null
 
-  // Convert graduation_year to int (null if empty)
-  const graduationYear = graduationYearStr
-    ? parseInt(graduationYearStr, 10)
-    : null
+  // --- LOGIC FIXED HERE ---
+  let graduationYear: number | null = null
 
-  // Validate graduation_year if provided
-  if (graduationYearStr && (isNaN(graduationYear) || graduationYear < 1900 || graduationYear > 2100)) {
-    return { error: "Graduation year must be a valid year" }
+  if (graduationYearStr) {
+    const parsedYear = parseInt(graduationYearStr, 10)
+    
+    // Check validity on the parsed number specifically
+    if (isNaN(parsedYear) || parsedYear < 1900 || parsedYear > 2100) {
+      return { error: "Graduation year must be a valid year" }
+    }
+    
+    graduationYear = parsedYear
   }
+  // -----------------------
 
   // Prepare update data
   const updateData: ProfileUpdate = {
@@ -66,18 +71,3 @@ export async function updateProfile(formData: FormData) {
   revalidatePath("/profile")
   return { success: true }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
