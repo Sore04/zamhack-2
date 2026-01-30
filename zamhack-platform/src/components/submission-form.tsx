@@ -8,10 +8,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { submitMilestone } from "@/app/challenges/submission-actions"
+import { AlertCircle } from "lucide-react"
 
 interface SubmissionFormProps {
   milestoneId: string
   participantId: string
+  // New props added to match page.tsx usage
+  teamId?: string
+  isTeamLeader?: boolean
   requiresGithub?: boolean | null
   requiresUrl?: boolean | null
   requiresText?: boolean | null
@@ -20,6 +24,8 @@ interface SubmissionFormProps {
 export const SubmissionForm = ({
   milestoneId,
   participantId,
+  teamId,
+  isTeamLeader = false,
   requiresGithub = false,
   requiresUrl = false,
   requiresText = false,
@@ -30,6 +36,11 @@ export const SubmissionForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
   const router = useRouter()
+
+  // Determine if the user is allowed to submit
+  // Logic: If it's a team (teamId exists), only the leader can submit. 
+  // If it's solo (no teamId), anyone can submit.
+  const canSubmit = !teamId || isTeamLeader
 
   // Auto-dismiss toast after 3 seconds
   useEffect(() => {
@@ -43,6 +54,12 @@ export const SubmissionForm = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!canSubmit) {
+      setToast({ message: "Only team leaders can submit milestones.", type: "error" })
+      return
+    }
+
     setIsSubmitting(true)
     setToast(null)
 
@@ -50,6 +67,12 @@ export const SubmissionForm = ({
       const formData = new FormData()
       formData.append("milestone_id", milestoneId)
       formData.append("participant_id", participantId)
+      
+      // Optionally append team info if needed by server action
+      if (teamId) {
+        formData.append("team_id", teamId)
+      }
+
       if (githubLink.trim()) {
         formData.append("github_link", githubLink.trim())
       }
@@ -98,6 +121,15 @@ export const SubmissionForm = ({
           <p className="text-sm text-muted-foreground">
             No submission requirements for this milestone.
           </p>
+          {/* Still allow submitting to mark as complete if no requirements */}
+          <div className="mt-4">
+             <Button 
+               onClick={handleSubmit} 
+               disabled={isSubmitting || !canSubmit}
+             >
+               {isSubmitting ? "Marking as Complete..." : "Mark as Complete"}
+             </Button>
+          </div>
         </CardContent>
       </Card>
     )
@@ -109,6 +141,14 @@ export const SubmissionForm = ({
         <CardTitle>Submit Your Work</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Warning for non-leaders */}
+        {!canSubmit && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md flex items-center gap-2 text-yellow-800 text-sm">
+            <AlertCircle className="h-4 w-4" />
+            Only the team leader can submit milestones.
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {requiresGithub && (
             <div className="space-y-2">
@@ -122,7 +162,7 @@ export const SubmissionForm = ({
                 value={githubLink}
                 onChange={(e) => setGithubLink(e.target.value)}
                 required={requiresGithub}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !canSubmit}
               />
             </div>
           )}
@@ -139,7 +179,7 @@ export const SubmissionForm = ({
                 value={demoUrl}
                 onChange={(e) => setDemoUrl(e.target.value)}
                 required={requiresUrl}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !canSubmit}
               />
             </div>
           )}
@@ -156,13 +196,16 @@ export const SubmissionForm = ({
                 onChange={(e) => setWrittenResponse(e.target.value)}
                 required={requiresText}
                 rows={6}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !canSubmit}
               />
             </div>
           )}
 
           <div className="space-y-2">
-            <Button type="submit" disabled={isSubmitting || !isFormValid()}>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting || !isFormValid() || !canSubmit}
+            >
               {isSubmitting ? "Submitting..." : "Submit"}
             </Button>
 
@@ -184,6 +227,3 @@ export const SubmissionForm = ({
     </Card>
   )
 }
-
-
-
