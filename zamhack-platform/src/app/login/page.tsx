@@ -19,6 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ArrowLeft } from "lucide-react" // ADDED: Icon for the back button
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -54,7 +55,6 @@ const LoginPage = () => {
       if (result?.error) {
         setServerError(result.error)
       } else if (result?.success) {
-        // FIX: Redirect to root ('/') so the Smart Home Page can handle the role routing
         router.push("/")
         router.refresh()
       }
@@ -66,7 +66,17 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-black relative">
+      {/* ADDED: "Go back" Button */}
+      <div className="absolute top-4 left-4 md:top-8 md:left-8">
+        <Button variant="ghost" asChild className="gap-2">
+          <Link href="https://zamhack.com/">
+            <ArrowLeft className="h-4 w-4" />
+            Go back
+          </Link>
+        </Button>
+      </div>
+
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Login</CardTitle>

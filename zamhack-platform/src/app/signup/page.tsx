@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ArrowLeft } from "lucide-react" // ADDED: Icon for the back button
 
 // --- FIX: Define the shape first (without refinement) ---
 const baseSchemaShape = z.object({
@@ -88,7 +89,17 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 relative">
+        {/* ADDED: "Go back" Button for success screen */}
+        <div className="absolute top-4 left-4 md:top-8 md:left-8">
+          <Button variant="ghost" asChild className="gap-2">
+            <Link href="https://zamhack.com/">
+              <ArrowLeft className="h-4 w-4" />
+              Go back
+            </Link>
+          </Button>
+        </div>
+
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle>Check your email</CardTitle>
@@ -103,7 +114,17 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-black relative">
+      {/* ADDED: "Go back" Button for main form */}
+      <div className="absolute top-4 left-4 md:top-8 md:left-8">
+        <Button variant="ghost" asChild className="gap-2">
+          <Link href="https://zamhack.com/">
+            <ArrowLeft className="h-4 w-4" />
+            Go back
+          </Link>
+        </Button>
+      </div>
+
       <Card className="w-full max-w-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
