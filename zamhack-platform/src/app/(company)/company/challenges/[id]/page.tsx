@@ -7,8 +7,9 @@ import { Progress } from "@/components/ui/progress"
 import { Database } from "@/types/supabase"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-// --- NEW IMPORT ---
 import { submitChallengeForApproval } from "@/app/challenges/actions"
+// --- NEW IMPORT ---
+import { CloseChallengeButton } from "@/components/challenges/close-challenge-button"
 
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
 type Participant = Database["public"]["Tables"]["challenge_participants"]["Row"]
@@ -278,6 +279,8 @@ const getStatusBadgeVariant = (status: string | null) => {
       return "warning"
     case "completed":
       return "success"
+    case "closed":
+      return "destructive" // Mark closed as red/destructive style for visibility
     case "cancelled":
       return "destructive"
     default:
@@ -320,8 +323,9 @@ export default async function ChallengeManagementPage({
   const { challenge, participants, submissions, stats, milestoneProgress } =
     data
 
-  // --- NEW LOGIC: Check Status ---
   const isDraft = challenge.status === "draft"
+  // --- NEW LOGIC: Check if challenge is already closed ---
+  const isClosed = challenge.status === 'closed' || challenge.status === 'completed'
 
   return (
     <div className="space-y-6 p-6">
@@ -338,7 +342,7 @@ export default async function ChallengeManagementPage({
         </div>
         <div className="flex gap-2">
           
-           {/* --- NEW BUTTON: Submit for Approval --- */}
+           {/* Submit for Approval Button */}
            {isDraft && (
             <form
               action={async () => {
@@ -352,14 +356,19 @@ export default async function ChallengeManagementPage({
             </form>
           )}
 
-          {/* UPDATED: Functional Edit Link (Was disabled in your file) */}
+          {/* Edit Button */}
           <Button variant="outline" asChild>
             <Link href={`/company/challenges/${id}/edit`}>Edit Challenge</Link>
           </Button>
           
-          <Button variant="outline" disabled>
-            Close Challenge
-          </Button>
+          {/* --- UPDATED: Close Challenge Button with Logic --- */}
+          {isClosed ? (
+             <Button variant="outline" disabled className="opacity-50">
+               Challenge Closed
+             </Button>
+          ) : (
+             <CloseChallengeButton challengeId={challenge.id} />
+          )}
         </div>
       </div>
 
@@ -616,5 +625,3 @@ export default async function ChallengeManagementPage({
     </div>
   )
 }
-
-
