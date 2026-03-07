@@ -201,11 +201,10 @@ export async function closeChallenge(challengeId: string): Promise<{ success: bo
 
   leaderboard.sort((a, b) => b.score - a.score)
 
-  // 5. Pick Top 3 Winners — FIX: include `score` so it's persisted to the winners table
+  // 5. Pick Top 3 Winners
   const winners = leaderboard.slice(0, 3).map((entry, index) => ({
     challenge_id: challengeId,
     profile_id: entry.profile_id!,
-    score: entry.score, // <-- persists the computed score so the results page can display it
     rank: index + 1,
     prize: index === 0 ? "1st Place Prize" : index === 1 ? "2nd Place Prize" : "3rd Place Prize" 
   }))
