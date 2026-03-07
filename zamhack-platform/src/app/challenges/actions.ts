@@ -239,3 +239,102 @@ export async function closeChallenge(challengeId: string): Promise<{ success: bo
   // 9. Return success
   return { success: true, error: null }
 }
+
+// --- ACTION: RECALCULATE WINNERS ---
+// Fixes challenges that were closed before evaluations were saved.
+// Re-runs the same leaderboard logic as closeChallenge but does NOT
+// change the challenge status — safe to call on an already-closed challenge.
+export async function recalculateWinners(challengeId: string): Promise<{ success: boolean; error: string | null }> {
+  const supabase = await createClient()
+
+  // 1. Auth & Ownership Check
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, organization_id")
+    .eq("id", user.id)
+    .single()
+
+  if (!profile || (profile.role !== 'company_admin' && profile.role !== 'company_member')) {
+    return { success: false, error: "Only company admins can recalculate winners." }
+  }
+
+  // 2. Fetch Challenge to verify Org & confirm it is closed
+  const { data: challenge } = await supabase
+    .from("challenges")
+    .select("organization_id, status")
+    .eq("id", challengeId)
+    .single()
+
+  if (!challenge || challenge.organization_id !== profile.organization_id) {
+    return { success: false, error: "Unauthorized access to this challenge." }
+  }
+
+  if (challenge.status !== "closed" && challenge.status !== "completed") {
+    return { success: false, error: "Can only recalculate winners for closed challenges." }
+  }
+
+  // 3. Fetch All Participants with Submissions & Evaluations
+  const { data: participants } = await supabase
+    .from("challenge_participants")
+    .select(`
+      id,
+      user_id,
+      submissions (
+        evaluations (
+          score
+        )
+      )
+    `)
+    .eq("challenge_id", challengeId)
+
+  if (!participants || participants.length === 0) {
+    return { success: false, error: "No participants found for this challenge." }
+  }
+
+  // 4. Calculate Leaderboard — sum all evaluation scores per participant
+  const leaderboard = participants.map((p: any) => {
+    const totalScore = p.submissions.reduce((acc: number, sub: any) => {
+      const evalScore = sub.evaluations?.[0]?.score || 0
+      return acc + evalScore
+    }, 0)
+
+    return {
+      participant_id: p.id,
+      profile_id: p.user_id,
+      score: totalScore,
+    }
+  })
+
+  leaderboard.sort((a, b) => b.score - a.score)
+
+  // 5. Pick Top 3 Winners with score persisted
+  const winners = leaderboard.slice(0, 3).map((entry, index) => ({
+    challenge_id: challengeId,
+    profile_id: entry.profile_id!,
+    score: entry.score,
+    rank: index + 1,
+    prize:
+      index === 0 ? "1st Place Prize" :
+      index === 1 ? "2nd Place Prize" :
+                   "3rd Place Prize",
+  }))
+
+  // 6. Replace existing winners in DB
+  await supabase.from("winners").delete().eq("challenge_id", challengeId)
+
+  const { error: winnerError } = await supabase.from("winners").insert(winners)
+  if (winnerError) {
+    console.error("Recalculate winner save error:", winnerError)
+    return { success: false, error: "Failed to save recalculated winners." }
+  }
+
+  // 7. Revalidate so results page reflects new data immediately
+  revalidatePath(`/challenges/${challengeId}`)
+  revalidatePath(`/challenges/${challengeId}/results`)
+  revalidatePath(`/company/challenges/${challengeId}`)
+
+  return { success: true, error: null }
+}

@@ -7,10 +7,11 @@ import { Progress } from "@/components/ui/progress"
 import { Database } from "@/types/supabase"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { Lock } from "lucide-react" // Added Lock icon
+import { Lock } from "lucide-react"
 import { submitChallengeForApproval } from "@/app/challenges/actions"
-// --- NEW IMPORT ---
 import { CloseChallengeButton } from "@/components/challenges/close-challenge-button"
+// --- NEW IMPORT ---
+import { RecalculateWinnersButton } from "@/components/challenges/recalculate-winners-button"
 
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
 type Participant = Database["public"]["Tables"]["challenge_participants"]["Row"]
@@ -362,12 +363,16 @@ export default async function ChallengeManagementPage({
             <Link href={`/company/challenges/${id}/edit`}>Edit Challenge</Link>
           </Button>
           
-          {/* Close Challenge Button */}
+          {/* Close / Recalculate Buttons */}
           {isClosed ? (
-             <Button variant="outline" disabled className="opacity-50">
-               <Lock className="mr-2 h-4 w-4" />
-               Challenge Closed
-             </Button>
+            <div className="flex flex-col gap-2">
+              <Button variant="outline" disabled className="opacity-50">
+                <Lock className="mr-2 h-4 w-4" />
+                Challenge Closed
+              </Button>
+              {/* --- NEW: Recalculate Winners Button --- */}
+              <RecalculateWinnersButton challengeId={challenge.id} />
+            </div>
           ) : (
              <CloseChallengeButton challengeId={challenge.id} />
           )}
