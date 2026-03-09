@@ -49,6 +49,8 @@ CREATE TABLE public.challenges (
   embedding USER-DEFINED,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  entry_fee_amount numeric DEFAULT 0,
+  currency text DEFAULT 'PHP'::text,
   CONSTRAINT challenges_pkey PRIMARY KEY (id),
   CONSTRAINT challenges_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
   CONSTRAINT challenges_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
@@ -118,7 +120,33 @@ CREATE TABLE public.organizations (
   max_seats integer DEFAULT 5,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  status text DEFAULT 'pending'::text,
   CONSTRAINT organizations_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.payments (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  challenge_id uuid NOT NULL,
+  amount integer NOT NULL CHECK (amount > 0),
+  currency text NOT NULL DEFAULT 'PHP'::text,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'paid'::text, 'failed'::text, 'refunded'::text])),
+  provider text NOT NULL DEFAULT 'paymongo'::text,
+  checkout_session_id text UNIQUE,
+  payment_intent_id text UNIQUE,
+  created_at timestamp with time zone DEFAULT now(),
+  paid_at timestamp with time zone,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT payments_pkey PRIMARY KEY (id),
+  CONSTRAINT payments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT payments_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id)
+);
+CREATE TABLE public.platform_settings (
+  id boolean NOT NULL DEFAULT true CHECK (id),
+  maintenance_mode boolean DEFAULT false,
+  allow_new_signups boolean DEFAULT true,
+  default_currency text DEFAULT 'PHP'::text,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT platform_settings_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.profiles (
   id uuid NOT NULL,
@@ -145,9 +173,31 @@ CREATE TABLE public.profiles (
   address_city text,
   address_zip text,
   address_country text,
+  status text DEFAULT 'active'::text,
+  middle_name text,
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id),
   CONSTRAINT profiles_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.rubrics (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  challenge_id uuid NOT NULL,
+  criteria_name text NOT NULL,
+  max_points integer DEFAULT 10,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT rubrics_pkey PRIMARY KEY (id),
+  CONSTRAINT rubrics_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id)
+);
+CREATE TABLE public.scores (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  submission_id uuid NOT NULL,
+  rubric_id uuid NOT NULL,
+  points_awarded integer NOT NULL,
+  feedback text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scores_pkey PRIMARY KEY (id),
+  CONSTRAINT scores_submission_id_fkey FOREIGN KEY (submission_id) REFERENCES public.submissions(id),
+  CONSTRAINT scores_rubric_id_fkey FOREIGN KEY (rubric_id) REFERENCES public.rubrics(id)
 );
 CREATE TABLE public.skills (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -196,4 +246,16 @@ CREATE TABLE public.teams (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT teams_pkey PRIMARY KEY (id),
   CONSTRAINT teams_leader_id_fkey FOREIGN KEY (leader_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.winners (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  challenge_id uuid NOT NULL,
+  profile_id uuid NOT NULL,
+  rank integer NOT NULL,
+  prize text,
+  announced_at timestamp with time zone DEFAULT now(),
+  score integer,
+  CONSTRAINT winners_pkey PRIMARY KEY (id),
+  CONSTRAINT winners_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id),
+  CONSTRAINT winners_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
 );
