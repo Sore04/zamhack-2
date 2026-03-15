@@ -68,6 +68,9 @@ const formSchema = z.object({
 
   // Step 4: Skills
   skills: z.array(z.string()).min(1, "Add at least one skill"),
+
+  // Step 5: Scoring Mode
+  scoringMode: z.enum(["company_only", "evaluator_only", "average"]).default("company_only"),
 }).superRefine((data, ctx) => {
   // End date required unless perpetual
   if (!data.isPerpetual && !data.endDate) {
@@ -126,6 +129,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
       locationType: "online",
       locationDetails: "",
       isPerpetual: false,
+      scoringMode: "company_only" as const,
     },
     mode: "onChange",
   })
@@ -241,6 +245,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
         locationType: data.locationType,
         locationDetails: data.locationType === "onsite" ? (data.locationDetails || "TBA") : null,
         isPerpetual: data.isPerpetual,
+        scoringMode: data.scoringMode,
         startDate: data.startDate.toISOString(),
         endDate: data.isPerpetual ? null : (data.endDate?.toISOString() || null),
         registrationDeadline: data.registrationDeadline?.toISOString(),
@@ -381,6 +386,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                           <button
                             type="button"
                             onClick={() => toggleIndustry(ind)}
+                            aria-label={`Remove ${ind}`}
                             className="hover:text-destructive transition-colors"
                           >
                             <X className="h-3 w-3" />
@@ -780,12 +786,60 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                         className="inline-flex items-center gap-1 rounded-full bg-secondary text-secondary-foreground px-3 py-1 text-xs font-medium"
                       >
                         {skill}
-                        <button type="button" onClick={() => removeSkill(skill)}>
+                        <button type="button" onClick={() => removeSkill(skill)} aria-label={`Remove ${skill}`}>
                           <X className="h-3 w-3 hover:text-destructive" />
                         </button>
                       </span>
                     ))}
                   </div>
+                </div>
+
+                {/* ── SCORING MODE ── */}
+                <div className="space-y-3 rounded-md border p-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Scoring Mode</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      How should submission scores be calculated when both a company member and an evaluator review the same submission?
+                    </p>
+                  </div>
+                  <RadioGroup
+                    value={watchedValues.scoringMode}
+                    onValueChange={(val: "company_only" | "evaluator_only" | "average") =>
+                      form.setValue("scoringMode", val)
+                    }
+                    className="space-y-2"
+                  >
+                    <div className={cn(
+                      "flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors",
+                      watchedValues.scoringMode === "company_only" && "border-primary bg-primary/5"
+                    )}>
+                      <RadioGroupItem value="company_only" id="score-company" className="mt-0.5" />
+                      <label htmlFor="score-company" className="cursor-pointer">
+                        <p className="text-sm font-medium">Company Only</p>
+                        <p className="text-xs text-muted-foreground">Only your team's score counts. Evaluator feedback is shown as advisory.</p>
+                      </label>
+                    </div>
+                    <div className={cn(
+                      "flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors",
+                      watchedValues.scoringMode === "evaluator_only" && "border-primary bg-primary/5"
+                    )}>
+                      <RadioGroupItem value="evaluator_only" id="score-evaluator" className="mt-0.5" />
+                      <label htmlFor="score-evaluator" className="cursor-pointer">
+                        <p className="text-sm font-medium">Evaluator Only</p>
+                        <p className="text-xs text-muted-foreground">The assigned expert's score is the official result. Your feedback is shown as advisory.</p>
+                      </label>
+                    </div>
+                    <div className={cn(
+                      "flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors",
+                      watchedValues.scoringMode === "average" && "border-primary bg-primary/5"
+                    )}>
+                      <RadioGroupItem value="average" id="score-average" className="mt-0.5" />
+                      <label htmlFor="score-average" className="cursor-pointer">
+                        <p className="text-sm font-medium">Average Both</p>
+                        <p className="text-xs text-muted-foreground">Final score is the average of your score and the evaluator's score.</p>
+                      </label>
+                    </div>
+                  </RadioGroup>
                 </div>
               </div>
             )}
@@ -845,6 +899,14 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                   <div>
                     <h3 className="font-semibold text-muted-foreground text-sm">Milestones</h3>
                     <p>{watchedValues.milestones.length} milestone{watchedValues.milestones.length !== 1 ? "s" : ""} defined</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-muted-foreground text-sm">Scoring Mode</h3>
+                    <p>
+                      {watchedValues.scoringMode === "company_only" && "Company Only"}
+                      {watchedValues.scoringMode === "evaluator_only" && "Evaluator Only"}
+                      {watchedValues.scoringMode === "average" && "Average Both"}
+                    </p>
                   </div>
                 </div>
 
