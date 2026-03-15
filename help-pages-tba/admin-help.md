@@ -1,7 +1,7 @@
-#Start here
+# Start here
 
-#Table of Contents
+# Table of Contents
 
-##How to Approve a Challenge
+## How to Approve a Challenge
 1. Do this
 2. Do that
