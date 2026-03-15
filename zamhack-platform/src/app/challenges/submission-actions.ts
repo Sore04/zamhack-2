@@ -1,8 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 import { createClient } from "@/utils/supabase/server"
 import { Database } from "@/types/supabase"
+import { autoEvaluateSubmission } from "@/lib/auto-evaluate"
 
 type SubmissionInsert = Database["public"]["Tables"]["submissions"]["Insert"]
 
@@ -64,6 +66,7 @@ export async function submitMilestone(formData: FormData) {
   }
 
   let error: { error: string } | null = null
+  let submissionId: string | null = existingSubmission?.id ?? null
 
   if (existingSubmission) {
     // Update existing submission
@@ -77,12 +80,16 @@ export async function submitMilestone(formData: FormData) {
     }
   } else {
     // Insert new submission
-    const { error: insertError } = await supabase
+    const { data: insertedRow, error: insertError } = await supabase
       .from("submissions")
       .insert(submissionData)
+      .select("id")
+      .single()
 
     if (insertError) {
       error = { error: insertError.message || "Failed to create submission" }
+    } else {
+      submissionId = insertedRow?.id ?? null
     }
   }
 
@@ -94,13 +101,28 @@ export async function submitMilestone(formData: FormData) {
   // We need to get the challenge_id from the milestone to revalidate the correct path
   const { data: milestone } = await supabase
     .from("milestones")
-    .select("challenge_id")
+    .select("challenge_id, requires_text, requires_github, requires_url")
     .eq("id", milestoneId)
     .single()
 
   if (milestone?.challenge_id) {
     revalidatePath(`/my-challenges/${milestone.challenge_id}`)
     revalidatePath(`/challenges/${milestone.challenge_id}`)
+  }
+
+  // Trigger LLM auto-evaluation after response is sent (non-blocking)
+  // Only evaluate text-only milestones — skip when GitHub or URL submissions are required
+  const isTextOnly =
+    milestone?.requires_text === true &&
+    !milestone?.requires_github &&
+    !milestone?.requires_url
+
+  if (submissionId && milestone?.challenge_id && isTextOnly) {
+    after(() =>
+      autoEvaluateSubmission(submissionId!, milestone.challenge_id!, milestoneId).catch((err) =>
+        console.error("[auto-eval] failed:", err?.message ?? err)
+      )
+    )
   }
 
   return { success: true }

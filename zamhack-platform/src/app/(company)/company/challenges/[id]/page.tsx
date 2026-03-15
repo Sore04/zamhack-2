@@ -11,15 +11,12 @@ import { Lock } from "lucide-react"
 import { submitChallengeForApproval } from "@/app/challenges/actions"
 import { CloseChallengeButton } from "@/components/challenges/close-challenge-button"
 import { RecalculateWinnersButton } from "@/components/challenges/recalculate-winners-button"
-import { RubricManager } from "@/components/challenges/rubric-manager"
-
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
 type Participant = Database["public"]["Tables"]["challenge_participants"]["Row"]
 type Profile = Database["public"]["Tables"]["profiles"]["Row"]
 type Milestone = Database["public"]["Tables"]["milestones"]["Row"]
 type Submission = Database["public"]["Tables"]["submissions"]["Row"]
 type Evaluation = Database["public"]["Tables"]["evaluations"]["Row"]
-type Rubric = Database["public"]["Tables"]["rubrics"]["Row"]
 
 interface ParticipantWithProfile extends Participant {
   profile: Profile | null
@@ -36,7 +33,6 @@ interface ChallengeManagementData {
   participants: ParticipantWithProfile[]
   submissions: SubmissionWithDetails[]
   milestones: Milestone[]
-  rubrics: Rubric[]
   stats: {
     totalParticipants: number
     totalSubmissions: number
@@ -174,17 +170,6 @@ async function getChallengeManagementData(
     }
   }
 
-  // Fetch rubrics
-  const { data: rubrics, error: rubricsError } = await supabase
-    .from("rubrics")
-    .select("*")
-    .eq("challenge_id", challengeId)
-    .order("created_at", { ascending: true })
-
-  if (rubricsError) {
-    console.error("Error fetching rubrics:", rubricsError)
-  }
-
   const milestoneMap = new Map(milestonesList.map((m) => [m.id, m]))
   const participantMap = new Map(participantsWithProfiles.map((p) => [p.id, p]))
 
@@ -243,7 +228,6 @@ async function getChallengeManagementData(
     participants: participantsWithProfiles,
     submissions: submissionsWithDetails,
     milestones: milestonesList,
-    rubrics: rubrics || [],
     stats: {
       totalParticipants,
       totalSubmissions,
@@ -299,7 +283,7 @@ export default async function ChallengeManagementPage({
     redirect("/company/dashboard")
   }
 
-  const { challenge, participants, submissions, stats, milestoneProgress, rubrics } = data
+  const { challenge, participants, submissions, stats, milestoneProgress, milestones } = data
 
   const isDraft = challenge.status === "draft"
   const isClosed = challenge.status === "closed" || challenge.status === "completed"
@@ -358,9 +342,6 @@ export default async function ChallengeManagementPage({
           </TabsTrigger>
           <TabsTrigger value="submissions">
             Submissions ({stats.totalSubmissions})
-          </TabsTrigger>
-          <TabsTrigger value="scoring">
-            Scoring {rubrics.length > 0 && `(${rubrics.length})`}
           </TabsTrigger>
         </TabsList>
 
@@ -547,10 +528,6 @@ export default async function ChallengeManagementPage({
           </Card>
         </TabsContent>
 
-        {/* Scoring Tab */}
-        <TabsContent value="scoring" className="mt-6 max-w-2xl">
-          <RubricManager challengeId={challenge.id} initialRubrics={rubrics} />
-        </TabsContent>
       </Tabs>
     </div>
   )

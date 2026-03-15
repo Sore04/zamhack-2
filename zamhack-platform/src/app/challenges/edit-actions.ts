@@ -14,6 +14,7 @@ export type MilestoneInput = {
   requires_github: boolean;
   requires_url: boolean;
   requires_text: boolean;
+  criteria?: { criteriaName: string; maxPoints: number }[];
 };
 
 export type UpdateChallengeInput = {
@@ -114,8 +115,21 @@ export async function updateChallenge(
             requires_text: milestone.requires_text,
           })
           .eq("id", milestone.id);
+
+        // Replace criteria for this milestone
+        await (supabase.from("rubrics") as any).delete().eq("milestone_id", milestone.id);
+        if (milestone.criteria && milestone.criteria.length > 0) {
+          await supabase.from("rubrics").insert(
+            milestone.criteria.map((c) => ({
+              challenge_id: challengeId,
+              milestone_id: milestone.id,
+              criteria_name: c.criteriaName,
+              max_points: c.maxPoints,
+            })) as any
+          );
+        }
       } else {
-        await supabase.from("milestones").insert({
+        const { data: newMilestone } = await supabase.from("milestones").insert({
           challenge_id: challengeId,
           title: milestone.title,
           description: milestone.description,
@@ -124,7 +138,18 @@ export async function updateChallenge(
           requires_github: milestone.requires_github,
           requires_url: milestone.requires_url,
           requires_text: milestone.requires_text,
-        });
+        }).select("id").single();
+
+        if (newMilestone && milestone.criteria && milestone.criteria.length > 0) {
+          await supabase.from("rubrics").insert(
+            milestone.criteria.map((c) => ({
+              challenge_id: challengeId,
+              milestone_id: newMilestone.id,
+              criteria_name: c.criteriaName,
+              max_points: c.maxPoints,
+            })) as any
+          );
+        }
       }
     }
 
@@ -154,7 +179,7 @@ export async function getChallengeForEdit(challengeId: string) {
 
   const { data: challenge, error } = await supabase
     .from("challenges")
-    .select(`*, milestones(*)`)
+    .select(`*, milestones(*, rubrics(*))`)
     .eq("id", challengeId)
     .single();
 

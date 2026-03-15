@@ -133,12 +133,24 @@ async function getSubmissionReviewData(
     }
   }
 
-  // Fetch rubrics
-  const { data: rubrics } = await supabase
+  // Fetch milestone-scoped rubrics; fall back to challenge-level (milestone_id IS NULL)
+  const { data: milestoneRubrics } = await (supabase
     .from("rubrics")
     .select("*")
-    .eq("challenge_id", challengeId)
+    .eq("challenge_id", challengeId) as any)
+    .eq("milestone_id", submission.milestone_id)
     .order("created_at")
+
+  let rubrics = (milestoneRubrics as any[]) ?? []
+  if (rubrics.length === 0) {
+    const { data: fallbackRubrics } = await (supabase
+      .from("rubrics")
+      .select("*")
+      .eq("challenge_id", challengeId) as any)
+      .is("milestone_id", null)
+      .order("created_at")
+    rubrics = (fallbackRubrics as any[]) ?? []
+  }
 
   // Fetch existing evaluation (including drafts)
   const { data: evaluation } = await supabase

@@ -93,6 +93,10 @@ export default function EditChallengeForm({
         requires_github: m.requires_github ?? false,
         requires_url: m.requires_url ?? false,
         requires_text: m.requires_text ?? false,
+        criteria: (m.rubrics ?? []).map((r: any) => ({
+          criteriaName: r.criteria_name,
+          maxPoints: r.max_points ?? 10,
+        })),
       }))
   );
 
@@ -118,6 +122,41 @@ export default function EditChallengeForm({
   function updateMilestone(index: number, field: keyof MilestoneInput, value: any) {
     setMilestones((prev) =>
       prev.map((m, i) => (i === index ? { ...m, [field]: value } : m))
+    );
+  }
+
+  function addCriterion(milestoneIndex: number) {
+    setMilestones((prev) =>
+      prev.map((m, i) =>
+        i === milestoneIndex
+          ? { ...m, criteria: [...(m.criteria ?? []), { criteriaName: "", maxPoints: 10 }] }
+          : m
+      )
+    );
+  }
+
+  function updateCriterion(milestoneIndex: number, cIdx: number, field: "criteriaName" | "maxPoints", value: any) {
+    setMilestones((prev) =>
+      prev.map((m, i) =>
+        i === milestoneIndex
+          ? {
+              ...m,
+              criteria: (m.criteria ?? []).map((c, j) =>
+                j === cIdx ? { ...c, [field]: value } : c
+              ),
+            }
+          : m
+      )
+    );
+  }
+
+  function removeCriterion(milestoneIndex: number, cIdx: number) {
+    setMilestones((prev) =>
+      prev.map((m, i) =>
+        i === milestoneIndex
+          ? { ...m, criteria: (m.criteria ?? []).filter((_, j) => j !== cIdx) }
+          : m
+      )
     );
   }
 
@@ -524,6 +563,51 @@ export default function EditChallengeForm({
                 />
                 Requires Text
               </label>
+            </div>
+
+            {/* Scoring Criteria */}
+            <div className="space-y-2 pt-3 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">Scoring Criteria (optional)</span>
+                <button
+                  type="button"
+                  onClick={() => addCriterion(i)}
+                  className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                >
+                  + Add Criterion
+                </button>
+              </div>
+              {(m.criteria ?? []).length === 0 && (
+                <p className="text-xs text-gray-400">No scoring criteria defined for this milestone.</p>
+              )}
+              {(m.criteria ?? []).map((c, cIdx) => (
+                <div key={cIdx} className="flex items-center gap-2">
+                  <input
+                    title="Criterion Name"
+                    placeholder="e.g. Code Quality"
+                    className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400"
+                    value={c.criteriaName}
+                    onChange={(e) => updateCriterion(i, cIdx, "criteriaName", e.target.value)}
+                  />
+                  <input
+                    title="Max Points"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    className="w-16 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-orange-400"
+                    value={c.maxPoints}
+                    onChange={(e) => updateCriterion(i, cIdx, "maxPoints", Number(e.target.value))}
+                  />
+                  <span className="text-xs text-gray-500 shrink-0">pts</span>
+                  <button
+                    type="button"
+                    onClick={() => removeCriterion(i, cIdx)}
+                    className="text-xs text-red-500 hover:text-red-700 shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         ))}

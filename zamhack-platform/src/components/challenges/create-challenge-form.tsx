@@ -22,6 +22,11 @@ import { createChallenge } from "@/app/challenges/create-actions"
 import { toast } from "sonner"
 
 // --- Schemas ---
+const criterionSchema = z.object({
+  criteriaName: z.string().min(1, "Criterion name is required"),
+  maxPoints: z.number().min(1).max(1000).default(10),
+})
+
 const milestoneSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
@@ -31,6 +36,7 @@ const milestoneSchema = z.object({
   requiresGithub: z.boolean().default(false),
   requiresUrl: z.boolean().default(false),
   requiresText: z.boolean().default(false),
+  criteria: z.array(criterionSchema).default([]),
 })
 
 const formSchema = z.object({
@@ -118,7 +124,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
     defaultValues: {
       participationType: "solo",
       difficulty: "beginner",
-      milestones: [{ title: "Final Submission", requiresGithub: true, requiresUrl: true, requiresText: true }],
+      milestones: [{ title: "Final Submission", requiresGithub: true, requiresUrl: true, requiresText: true, criteria: [] }],
       skills: [],
       requiresEntryFee: false,
       currency: "PHP",
@@ -747,12 +753,63 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                         </div>
                       </div>
                     </div>
+
+                    {/* Scoring Criteria */}
+                    <div className="space-y-2 pt-3 border-t">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Scoring Criteria <span className="text-muted-foreground">(optional)</span></Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => {
+                            const current = form.getValues(`milestones.${index}.criteria`) || []
+                            form.setValue(`milestones.${index}.criteria`, [...current, { criteriaName: "", maxPoints: 10 }])
+                          }}
+                        >
+                          <Plus className="h-3 w-3" /> Add Criterion
+                        </Button>
+                      </div>
+                      {(watchedValues.milestones[index]?.criteria || []).length === 0 && (
+                        <p className="text-xs text-muted-foreground">No scoring criteria yet.</p>
+                      )}
+                      {(watchedValues.milestones[index]?.criteria || []).map((_, cIdx) => (
+                        <div key={cIdx} className="flex items-center gap-2">
+                          <Input
+                            className="h-8 flex-1 text-xs"
+                            {...form.register(`milestones.${index}.criteria.${cIdx}.criteriaName`)}
+                            placeholder="e.g. Code Quality"
+                          />
+                          <Input
+                            className="h-8 w-20 text-xs"
+                            type="number"
+                            min={1}
+                            max={1000}
+                            {...form.register(`milestones.${index}.criteria.${cIdx}.maxPoints`, { valueAsNumber: true })}
+                          />
+                          <span className="text-xs text-muted-foreground shrink-0">pts</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              const current = form.getValues(`milestones.${index}.criteria`) || []
+                              form.setValue(`milestones.${index}.criteria`, current.filter((_, i) => i !== cIdx))
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => append({ title: "", description: "", dueDate: new Date(), requiresGithub: false, requiresUrl: false, requiresText: true })}
+                  onClick={() => append({ title: "", description: "", dueDate: new Date(), requiresGithub: false, requiresUrl: false, requiresText: true, criteria: [] })}
                 >
                   <Plus className="mr-2 h-4 w-4" /> Add Milestone
                 </Button>
@@ -844,7 +901,16 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                   </div>
                   <div>
                     <h3 className="font-semibold text-muted-foreground text-sm">Milestones</h3>
-                    <p>{watchedValues.milestones.length} milestone{watchedValues.milestones.length !== 1 ? "s" : ""} defined</p>
+                    <div className="space-y-0.5 mt-0.5">
+                      {watchedValues.milestones.map((m, i) => (
+                        <p key={i} className="text-xs">
+                          {i + 1}. {m.title || "(untitled)"}
+                          {(m.criteria || []).length > 0 && (
+                            <span className="text-muted-foreground"> — {(m.criteria || []).length} criteria</span>
+                          )}
+                        </p>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

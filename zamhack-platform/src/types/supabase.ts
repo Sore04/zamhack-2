@@ -713,6 +713,7 @@ export type Database = {
           criteria_name: string
           id: string
           max_points: number | null
+          milestone_id: string | null
         }
         Insert: {
           challenge_id: string
@@ -720,6 +721,7 @@ export type Database = {
           criteria_name: string
           id?: string
           max_points?: number | null
+          milestone_id?: string | null
         }
         Update: {
           challenge_id?: string
@@ -727,6 +729,7 @@ export type Database = {
           criteria_name?: string
           id?: string
           max_points?: number | null
+          milestone_id?: string | null
         }
         Relationships: [
           {
@@ -734,6 +737,13 @@ export type Database = {
             columns: ["challenge_id"]
             isOneToOne: false
             referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rubrics_milestone_id_fkey"
+            columns: ["milestone_id"]
+            isOneToOne: false
+            referencedRelation: "milestones"
             referencedColumns: ["id"]
           },
         ]

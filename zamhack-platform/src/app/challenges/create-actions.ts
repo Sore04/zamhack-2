@@ -14,6 +14,7 @@ interface MilestoneInput {
   requiresGithub: boolean
   requiresUrl: boolean
   requiresText: boolean
+  criteria?: { criteriaName: string; maxPoints: number }[]
 }
 
 interface CreateChallengeInput {
@@ -171,15 +172,40 @@ export const createChallenge = async (
       requires_text: milestone.requiresText,
     }))
 
-    const { error: milestonesError } = await supabase
+    const { data: insertedMilestones, error: milestonesError } = await supabase
       .from("milestones")
       .insert(milestonesData)
+      .select("id, sequence_order")
 
-    if (milestonesError) {
+    if (milestonesError || !insertedMilestones) {
       await supabase.from("challenges").delete().eq("id", challengeId)
       return {
         success: false,
-        error: milestonesError.message || "Failed to create milestones",
+        error: milestonesError?.message || "Failed to create milestones",
+      }
+    }
+
+    // Step 3b: Insert rubrics for each milestone's criteria
+    const rubricsData: { challenge_id: string; milestone_id: string; criteria_name: string; max_points: number }[] = []
+    for (let i = 0; i < input.milestones.length; i++) {
+      const milestone = input.milestones[i]
+      const insertedMilestone = insertedMilestones[i]
+      if (!insertedMilestone) continue
+      for (const c of milestone.criteria ?? []) {
+        rubricsData.push({
+          challenge_id: challengeId,
+          milestone_id: insertedMilestone.id,
+          criteria_name: c.criteriaName,
+          max_points: c.maxPoints,
+        })
+      }
+    }
+    if (rubricsData.length > 0) {
+      const { error: rubricsError } = await supabase.from("rubrics").insert(rubricsData as any)
+      if (rubricsError) {
+        await supabase.from("milestones").delete().eq("challenge_id", challengeId)
+        await supabase.from("challenges").delete().eq("id", challengeId)
+        return { success: false, error: rubricsError.message || "Failed to create rubrics" }
       }
     }
 
