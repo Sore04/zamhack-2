@@ -349,3 +349,61 @@ export async function removeEvaluator(
   revalidatePath(`/evaluator/assignments`)
   return { success: true }
 }
+// ==========================================
+// EVALUATOR CREATION
+// ==========================================
+
+export async function createEvaluator(
+  email: string,
+  firstName: string,
+  lastName: string
+): Promise<{ success: boolean; error?: string }> {
+  const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+
+  // Verify calling user is admin
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (profile?.role !== "admin") return { success: false, error: "Unauthorized" }
+
+  // Use service role client to create auth user
+  const serviceClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  // Invite user by email — sends set-password link
+  const { data: inviteData, error: inviteError } = await serviceClient.auth.admin.inviteUserByEmail(
+    email,
+    { data: { first_name: firstName, last_name: lastName } }
+  )
+
+  if (inviteError || !inviteData.user) {
+    return { success: false, error: inviteError?.message || "Failed to send invite" }
+  }
+
+  // Update their profile to set role + name
+  const { error: profileError } = await serviceClient
+    .from("profiles")
+    .update({
+      role: "evaluator",
+      first_name: firstName,
+      last_name: lastName,
+    })
+    .eq("id", inviteData.user.id)
+
+  if (profileError) {
+    return { success: false, error: "Invite sent but failed to set evaluator role: " + profileError.message }
+  }
+
+  revalidatePath("/admin/users")
+  return { success: true }
+}

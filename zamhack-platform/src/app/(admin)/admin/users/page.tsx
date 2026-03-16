@@ -2,8 +2,9 @@ import { createClient } from "@/utils/supabase/server"
 import { redirect } from "next/navigation"
 import { Database } from "@/types/supabase"
 import { UserActionsCell } from "./user-actions-cell"
-import { Users, GraduationCap, Building2, ShieldCheck, Search } from "lucide-react"
+import { Users, GraduationCap, Building2, ShieldCheck, Search, ClipboardList } from "lucide-react"
 import "@/app/(admin)/admin.css"
+import CreateEvaluatorButton from "./create-evaluator-button"
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"] & {
   organization?: { name: string | null } | null
@@ -56,9 +57,10 @@ export default async function AdminUsersPage({
   const filtered = allProfiles.filter((p) => {
     const matchesTab =
       activeTab === "all" ||
-      (activeTab === "students"  && p.role === "student") ||
-      (activeTab === "companies" && (p.role === "company_admin" || p.role === "company_member")) ||
-      (activeTab === "admins"    && p.role === "admin")
+      (activeTab === "students"   && p.role === "student") ||
+      (activeTab === "companies"  && (p.role === "company_admin" || p.role === "company_member")) ||
+      (activeTab === "admins"     && p.role === "admin") ||
+      (activeTab === "evaluators" && p.role === "evaluator")
 
     const fullName = `${p.first_name || ""} ${p.last_name || ""}`.toLowerCase()
     const matchesSearch =
@@ -73,10 +75,11 @@ export default async function AdminUsersPage({
 
   // --- Counts (always from allProfiles, ignoring filters) ---
   const counts = {
-    all:       allProfiles.length,
-    students:  allProfiles.filter((p) => p.role === "student").length,
-    companies: allProfiles.filter((p) => p.role === "company_admin" || p.role === "company_member").length,
-    admins:    allProfiles.filter((p) => p.role === "admin").length,
+    all:        allProfiles.length,
+    students:   allProfiles.filter((p) => p.role === "student").length,
+    companies:  allProfiles.filter((p) => p.role === "company_admin" || p.role === "company_member").length,
+    admins:     allProfiles.filter((p) => p.role === "admin").length,
+    evaluators: allProfiles.filter((p) => p.role === "evaluator").length,
   }
 
   // --- Pagination ---
@@ -106,10 +109,11 @@ export default async function AdminUsersPage({
 
   // --- Tabs ---
   const tabs = [
-    { key: "all",       label: "All Users",    icon: Users,       count: counts.all },
-    { key: "students",  label: "Students",     icon: GraduationCap, count: counts.students },
-    { key: "companies", label: "Companies",    icon: Building2,   count: counts.companies },
-    { key: "admins",    label: "Admins",       icon: ShieldCheck, count: counts.admins },
+    { key: "all",        label: "All Users",   icon: Users,          count: counts.all },
+    { key: "students",   label: "Students",    icon: GraduationCap,  count: counts.students },
+    { key: "companies",  label: "Companies",   icon: Building2,      count: counts.companies },
+    { key: "evaluators", label: "Evaluators",  icon: ClipboardList,  count: counts.evaluators },
+    { key: "admins",     label: "Admins",      icon: ShieldCheck,    count: counts.admins },
   ]
 
   // --- Badge helpers ---
@@ -254,6 +258,8 @@ export default async function AdminUsersPage({
               ? "No users found"
               : `${(safePage - 1) * PER_PAGE + 1}–${Math.min(safePage * PER_PAGE, filtered.length)} of ${filtered.length} users`}
           </div>
+
+          {activeTab === "evaluators" && <CreateEvaluatorButton />}
         </div>
 
         {/* Active search chip */}
