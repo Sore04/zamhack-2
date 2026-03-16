@@ -6,7 +6,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { approveChallenge, rejectChallenge, approvePendingEdit, rejectPendingEdit } from "@/app/admin/actions"
 import { ArrowLeft, CheckCircle, XCircle, Clock } from "lucide-react"
-import { EvaluatorAssignmentPanel } from "@/components/admin/evaluator-assignment-panel"
+import EvaluatorAssignmentPanel from "@/components/admin/evaluator-assignment-panel"
 
 export default async function AdminChallengeDetailsPage({
   params,

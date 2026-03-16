@@ -31,7 +31,7 @@ interface EvaluatorAssignmentPanelProps {
   availableEvaluators: AvailableEvaluator[]
 }
 
-export function EvaluatorAssignmentPanel({
+export default function EvaluatorAssignmentPanel({
   challengeId,
   currentAssignments,
   availableEvaluators,
