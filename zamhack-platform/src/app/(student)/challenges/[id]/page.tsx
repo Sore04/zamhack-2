@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import DownloadCertificateButton from "@/components/certificate/download-certificate-btn"
+import { RubricCriteriaCard } from "@/components/rubric-criteria-card"
 
 // --- Types ---
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
@@ -27,6 +28,7 @@ type Organization = Database["public"]["Tables"]["organizations"]["Row"]
 type Milestone = Database["public"]["Tables"]["milestones"]["Row"]
 type Submission = Database["public"]["Tables"]["submissions"]["Row"]
 type Evaluation = Database["public"]["Tables"]["evaluations"]["Row"]
+type Rubric = Database["public"]["Tables"]["rubrics"]["Row"]
 type ChallengeParticipant =
   Database["public"]["Tables"]["challenge_participants"]["Row"]
 
@@ -42,6 +44,7 @@ interface ChallengeProgressData {
   participant: ChallengeParticipant | null
   submissions: Submission[]
   evaluations: Evaluation[]
+  rubrics: Rubric[]
   userTeam: TeamData | null
   userId: string
   studentName: string
@@ -114,7 +117,14 @@ async function getChallengeData(
     }
   }
 
-  // 5. Team
+  // 5. Rubrics
+  const { data: rubrics } = await supabase
+    .from("rubrics")
+    .select("*")
+    .eq("challenge_id", id)
+    .order("created_at", { ascending: true })
+
+  // 6. Team
   const { data: teamMember } = await supabase
     .from("team_members")
     .select("team:teams(id, name, leader_id)")
@@ -123,7 +133,7 @@ async function getChallengeData(
 
   const userTeam = (teamMember?.team as unknown as TeamData | null) ?? null
 
-  // 6. Profile (for certificate)
+  // 7. Profile (for certificate)
   const { data: profile } = await supabase
     .from("profiles")
     .select("first_name, last_name")
@@ -141,6 +151,7 @@ async function getChallengeData(
     participant,
     submissions,
     evaluations,
+    rubrics: rubrics || [],
     userTeam,
     userId: user.id,
     studentName,
@@ -173,6 +184,7 @@ export default async function ChallengePage({
     participant,
     submissions,
     evaluations,
+    rubrics,
     userTeam,
     userId,
     studentName,
@@ -201,6 +213,15 @@ export default async function ChallengePage({
   const hasEntryFee = (challenge.entry_fee_amount || 0) > 0
   const feeAmount = challenge.entry_fee_amount
   const currency = challenge.currency || "PHP"
+
+  // Group rubrics by milestone_id; null key = challenge-level fallback
+  const milestoneRubricMap = new Map<string | null, Rubric[]>()
+  rubrics.forEach((r) => {
+    const key = (r as any).milestone_id ?? null
+    const arr = milestoneRubricMap.get(key) ?? []
+    arr.push(r)
+    milestoneRubricMap.set(key, arr)
+  })
 
   // Build milestone statuses
   let previousMilestoneCompleted = true
@@ -508,6 +529,17 @@ export default async function ChallengePage({
                       </Badge>
                     )}
                   </div>
+
+                  {/* Scoring Criteria for this milestone */}
+                  {(() => {
+                    const milestoneRubrics =
+                      milestoneRubricMap.get(milestone.id) ??
+                      milestoneRubricMap.get(null) ??
+                      []
+                    return milestoneRubrics.length > 0 ? (
+                      <RubricCriteriaCard rubrics={milestoneRubrics} />
+                    ) : null
+                  })()}
 
                   {/* Submission form */}
                   {milestone.status === "in_progress" && participant && (

@@ -266,3 +266,144 @@ export async function rejectPendingEdit(pendingEditId: string, adminNote?: strin
   revalidatePath(`/admin/challenges/${pendingEdit.challenge_id}`)
   revalidatePath(`/company/challenges/${pendingEdit.challenge_id}`)
 }
+
+// ==========================================
+// EVALUATOR ASSIGNMENT ACTIONS
+// ==========================================
+
+export async function assignEvaluator(
+  challengeId: string,
+  evaluatorId: string,
+  reviewDeadline: string | null
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (profile?.role !== "admin") return { success: false, error: "Unauthorized" }
+
+  // Verify the evaluator exists and has the evaluator role
+  const { data: evaluatorProfile } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", evaluatorId)
+    .single()
+
+  if (!evaluatorProfile || evaluatorProfile.role !== "evaluator") {
+    return { success: false, error: "User is not an evaluator" }
+  }
+
+  // Upsert — if already assigned, update the deadline
+  const { error } = await supabase
+    .from("challenge_evaluators")
+    .upsert(
+      {
+        challenge_id: challengeId,
+        evaluator_id: evaluatorId,
+        assigned_at: new Date().toISOString(),
+        review_deadline: reviewDeadline || null,
+      },
+      { onConflict: "challenge_id,evaluator_id" }
+    )
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath(`/admin/challenges/${challengeId}`)
+  revalidatePath(`/evaluator/assignments`)
+  return { success: true }
+}
+
+export async function removeEvaluator(
+  challengeId: string,
+  evaluatorId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (profile?.role !== "admin") return { success: false, error: "Unauthorized" }
+
+  const { error } = await supabase
+    .from("challenge_evaluators")
+    .delete()
+    .eq("challenge_id", challengeId)
+    .eq("evaluator_id", evaluatorId)
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath(`/admin/challenges/${challengeId}`)
+  revalidatePath(`/evaluator/assignments`)
+  return { success: true }
+}
+// ==========================================
+// EVALUATOR CREATION
+// ==========================================
+
+export async function createEvaluator(
+  email: string,
+  firstName: string,
+  lastName: string
+): Promise<{ success: boolean; error?: string }> {
+  const { createClient: createSupabaseClient } = await import("@supabase/supabase-js")
+
+  // Verify calling user is admin
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (profile?.role !== "admin") return { success: false, error: "Unauthorized" }
+
+  // Use service role client to create auth user
+  const serviceClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  // Invite user by email — sends set-password link
+  const { data: inviteData, error: inviteError } = await serviceClient.auth.admin.inviteUserByEmail(
+    email,
+    { data: { first_name: firstName, last_name: lastName } }
+  )
+
+  if (inviteError || !inviteData.user) {
+    return { success: false, error: inviteError?.message || "Failed to send invite" }
+  }
+
+  // Update their profile to set role + name
+  const { error: profileError } = await serviceClient
+    .from("profiles")
+    .update({
+      role: "evaluator",
+      first_name: firstName,
+      last_name: lastName,
+    })
+    .eq("id", inviteData.user.id)
+
+  if (profileError) {
+    return { success: false, error: "Invite sent but failed to set evaluator role: " + profileError.message }
+  }
+
+  revalidatePath("/admin/users")
+  return { success: true }
+}

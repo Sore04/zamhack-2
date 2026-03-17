@@ -1,5 +1,7 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
+--
+-- See bottom of file for implementation notes.
 
 CREATE TABLE public.challenge_evaluators (
   challenge_id uuid NOT NULL,
@@ -51,6 +53,10 @@ CREATE TABLE public.challenges (
   updated_at timestamp with time zone DEFAULT now(),
   entry_fee_amount numeric DEFAULT 0,
   currency text DEFAULT 'PHP'::text,
+  industries text[] DEFAULT '{}',
+  location_type text CHECK (location_type IN ('online', 'onsite')),
+  location_details text,
+  is_perpetual boolean NOT NULL DEFAULT false,
   CONSTRAINT challenges_pkey PRIMARY KEY (id),
   CONSTRAINT challenges_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
   CONSTRAINT challenges_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
@@ -142,15 +148,39 @@ CREATE TABLE public.profiles (
   updated_at timestamp with time zone DEFAULT now(),
   first_name text,
   last_name text,
+  middle_name text,
   address_house_no text,
   address_street text,
   address_barangay text,
   address_city text,
   address_zip text,
   address_country text,
+  status text DEFAULT 'active'::text,
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id),
   CONSTRAINT profiles_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.rubrics (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  challenge_id uuid NOT NULL,
+  milestone_id uuid,
+  criteria_name text NOT NULL,
+  max_points integer DEFAULT 10,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT rubrics_pkey PRIMARY KEY (id),
+  CONSTRAINT rubrics_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id),
+  CONSTRAINT rubrics_milestone_id_fkey FOREIGN KEY (milestone_id) REFERENCES public.milestones(id)
+);
+CREATE TABLE public.scores (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  submission_id uuid NOT NULL,
+  rubric_id uuid NOT NULL,
+  points_awarded integer NOT NULL,
+  feedback text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scores_pkey PRIMARY KEY (id),
+  CONSTRAINT scores_submission_id_fkey FOREIGN KEY (submission_id) REFERENCES public.submissions(id),
+  CONSTRAINT scores_rubric_id_fkey FOREIGN KEY (rubric_id) REFERENCES public.rubrics(id)
 );
 CREATE TABLE public.skills (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -200,3 +230,63 @@ CREATE TABLE public.teams (
   CONSTRAINT teams_pkey PRIMARY KEY (id),
   CONSTRAINT teams_leader_id_fkey FOREIGN KEY (leader_id) REFERENCES public.profiles(id)
 );
+CREATE TABLE public.winners (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  challenge_id uuid NOT NULL,
+  profile_id uuid NOT NULL,
+  rank integer NOT NULL,
+  prize text,
+  announced_at timestamp with time zone DEFAULT now(),
+  score integer,
+  CONSTRAINT winners_pkey PRIMARY KEY (id),
+  CONSTRAINT winners_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id),
+  CONSTRAINT winners_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- IMPLEMENTATION NOTES
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- evaluations.reviewer_id
+--   NULL when the evaluation was written by the LLM auto-evaluator.
+--   Non-null = a company_admin / company_member or evaluator profile.
+--   The auto-evaluator always writes is_draft = true so companies review before publishing.
+
+-- scores.feedback
+--   Populated with per-criterion feedback by the LLM auto-evaluator.
+--   Human reviewers currently leave this null (only evaluations.feedback is used).
+
+-- scores table in TypeScript
+--   The `scores` table is missing from some versions of the auto-generated
+--   supabase.ts types. Workaround already in place: cast as `"scores" as any`
+--   in grading-actions.ts and auto-evaluate.ts.
+
+-- rubrics.milestone_id
+--   NULL = challenge-level rubric (legacy / Scoring Tab additions without a milestone context).
+--   Non-null = criterion is scoped to that specific milestone.
+--   Both challenge_id and milestone_id are stored so rubrics can be queried either way.
+--   Migration: ALTER TABLE public.rubrics ADD COLUMN milestone_id uuid REFERENCES public.milestones(id);
+
+-- Auto-evaluation flow
+--   submissions → (after Next.js after()) → src/lib/auto-evaluate.ts
+--     1. Fetches rubrics for the submission's milestone (milestone_id = milestoneId)
+--        Falls back to challenge-level rubrics (milestone_id IS NULL) if none found.
+--     2. Fetches GitHub README if github_link is present
+--     3. Calls Claude Haiku API with structured prompt
+--     4. Writes evaluations row (reviewer_id=null, is_draft=true)
+--     5. Writes scores rows (one per rubric criterion)
+--   Trigger: submitMilestone server action in submission-actions.ts
+--   Uses service-role Supabase client (bypasses RLS).
+
+-- challenge_leaderboard (VIEW)
+--   Aggregates total evaluation scores and milestone completion count per
+--   participant per challenge. Used for leaderboard display and winners calculation.
+--   Only non-draft evaluations (is_draft = false) count toward totals.
+
+-- winners
+--   Populated when a challenge is closed (closeChallenge action).
+--   Top 3 participants ranked by total score from challenge_leaderboard view.
+--   Perpetual challenges (is_perpetual = true) skip winner calculation entirely.
+
+-- platform_settings
+--   Single-row table. id column is boolean (always true) acting as a singleton key.

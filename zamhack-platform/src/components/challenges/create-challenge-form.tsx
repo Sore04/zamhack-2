@@ -22,6 +22,11 @@ import { createChallenge } from "@/app/challenges/create-actions"
 import { toast } from "sonner"
 
 // --- Schemas ---
+const criterionSchema = z.object({
+  criteriaName: z.string().min(1, "Criterion name is required"),
+  maxPoints: z.number().min(1).max(1000).default(10),
+})
+
 const milestoneSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
@@ -31,6 +36,7 @@ const milestoneSchema = z.object({
   requiresGithub: z.boolean().default(false),
   requiresUrl: z.boolean().default(false),
   requiresText: z.boolean().default(false),
+  criteria: z.array(criterionSchema).default([]),
 })
 
 const formSchema = z.object({
@@ -68,6 +74,9 @@ const formSchema = z.object({
 
   // Step 4: Skills
   skills: z.array(z.string()).min(1, "Add at least one skill"),
+
+  // Step 5: Scoring Mode
+  scoringMode: z.enum(["company_only", "evaluator_only", "average"]).default("company_only"),
 }).superRefine((data, ctx) => {
   // End date required unless perpetual
   if (!data.isPerpetual && !data.endDate) {
@@ -118,7 +127,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
     defaultValues: {
       participationType: "solo",
       difficulty: "beginner",
-      milestones: [{ title: "Final Submission", requiresGithub: true, requiresUrl: true, requiresText: true }],
+      milestones: [{ title: "Final Submission", requiresGithub: true, requiresUrl: true, requiresText: true, criteria: [] }],
       skills: [],
       requiresEntryFee: false,
       currency: "PHP",
@@ -126,6 +135,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
       locationType: "online",
       locationDetails: "",
       isPerpetual: false,
+      scoringMode: "company_only" as const,
     },
     mode: "onChange",
   })
@@ -241,6 +251,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
         locationType: data.locationType,
         locationDetails: data.locationType === "onsite" ? (data.locationDetails || "TBA") : null,
         isPerpetual: data.isPerpetual,
+        scoringMode: data.scoringMode,
         startDate: data.startDate.toISOString(),
         endDate: data.isPerpetual ? null : (data.endDate?.toISOString() || null),
         registrationDeadline: data.registrationDeadline?.toISOString(),
@@ -381,6 +392,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                           <button
                             type="button"
                             onClick={() => toggleIndustry(ind)}
+                            aria-label={`Remove ${ind}`}
                             className="hover:text-destructive transition-colors"
                           >
                             <X className="h-3 w-3" />
@@ -747,12 +759,63 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                         </div>
                       </div>
                     </div>
+
+                    {/* Scoring Criteria */}
+                    <div className="space-y-2 pt-3 border-t">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Scoring Criteria <span className="text-muted-foreground">(optional)</span></Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => {
+                            const current = form.getValues(`milestones.${index}.criteria`) || []
+                            form.setValue(`milestones.${index}.criteria`, [...current, { criteriaName: "", maxPoints: 10 }])
+                          }}
+                        >
+                          <Plus className="h-3 w-3" /> Add Criterion
+                        </Button>
+                      </div>
+                      {(watchedValues.milestones[index]?.criteria || []).length === 0 && (
+                        <p className="text-xs text-muted-foreground">No scoring criteria yet.</p>
+                      )}
+                      {(watchedValues.milestones[index]?.criteria || []).map((_, cIdx) => (
+                        <div key={cIdx} className="flex items-center gap-2">
+                          <Input
+                            className="h-8 flex-1 text-xs"
+                            {...form.register(`milestones.${index}.criteria.${cIdx}.criteriaName`)}
+                            placeholder="e.g. Code Quality"
+                          />
+                          <Input
+                            className="h-8 w-20 text-xs"
+                            type="number"
+                            min={1}
+                            max={1000}
+                            {...form.register(`milestones.${index}.criteria.${cIdx}.maxPoints`, { valueAsNumber: true })}
+                          />
+                          <span className="text-xs text-muted-foreground shrink-0">pts</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              const current = form.getValues(`milestones.${index}.criteria`) || []
+                              form.setValue(`milestones.${index}.criteria`, current.filter((_, i) => i !== cIdx))
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => append({ title: "", description: "", dueDate: new Date(), requiresGithub: false, requiresUrl: false, requiresText: true })}
+                  onClick={() => append({ title: "", description: "", dueDate: new Date(), requiresGithub: false, requiresUrl: false, requiresText: true, criteria: [] })}
                 >
                   <Plus className="mr-2 h-4 w-4" /> Add Milestone
                 </Button>
@@ -780,12 +843,60 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                         className="inline-flex items-center gap-1 rounded-full bg-secondary text-secondary-foreground px-3 py-1 text-xs font-medium"
                       >
                         {skill}
-                        <button type="button" onClick={() => removeSkill(skill)}>
+                        <button type="button" onClick={() => removeSkill(skill)} aria-label={`Remove ${skill}`}>
                           <X className="h-3 w-3 hover:text-destructive" />
                         </button>
                       </span>
                     ))}
                   </div>
+                </div>
+
+                {/* ── SCORING MODE ── */}
+                <div className="space-y-3 rounded-md border p-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Scoring Mode</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      How should submission scores be calculated when both a company member and an evaluator review the same submission?
+                    </p>
+                  </div>
+                  <RadioGroup
+                    value={watchedValues.scoringMode}
+                    onValueChange={(val: "company_only" | "evaluator_only" | "average") =>
+                      form.setValue("scoringMode", val)
+                    }
+                    className="space-y-2"
+                  >
+                    <div className={cn(
+                      "flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors",
+                      watchedValues.scoringMode === "company_only" && "border-primary bg-primary/5"
+                    )}>
+                      <RadioGroupItem value="company_only" id="score-company" className="mt-0.5" />
+                      <label htmlFor="score-company" className="cursor-pointer">
+                        <p className="text-sm font-medium">Company Only</p>
+                        <p className="text-xs text-muted-foreground">Only your team's score counts. Evaluator feedback is shown as advisory.</p>
+                      </label>
+                    </div>
+                    <div className={cn(
+                      "flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors",
+                      watchedValues.scoringMode === "evaluator_only" && "border-primary bg-primary/5"
+                    )}>
+                      <RadioGroupItem value="evaluator_only" id="score-evaluator" className="mt-0.5" />
+                      <label htmlFor="score-evaluator" className="cursor-pointer">
+                        <p className="text-sm font-medium">Evaluator Only</p>
+                        <p className="text-xs text-muted-foreground">The assigned expert's score is the official result. Your feedback is shown as advisory.</p>
+                      </label>
+                    </div>
+                    <div className={cn(
+                      "flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors",
+                      watchedValues.scoringMode === "average" && "border-primary bg-primary/5"
+                    )}>
+                      <RadioGroupItem value="average" id="score-average" className="mt-0.5" />
+                      <label htmlFor="score-average" className="cursor-pointer">
+                        <p className="text-sm font-medium">Average Both</p>
+                        <p className="text-xs text-muted-foreground">Final score is the average of your score and the evaluator's score.</p>
+                      </label>
+                    </div>
+                  </RadioGroup>
                 </div>
               </div>
             )}
@@ -844,7 +955,24 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                   </div>
                   <div>
                     <h3 className="font-semibold text-muted-foreground text-sm">Milestones</h3>
-                    <p>{watchedValues.milestones.length} milestone{watchedValues.milestones.length !== 1 ? "s" : ""} defined</p>
+                    <div className="space-y-0.5 mt-0.5">
+                      {watchedValues.milestones.map((m, i) => (
+                        <p key={i} className="text-xs">
+                          {i + 1}. {m.title || "(untitled)"}
+                          {(m.criteria || []).length > 0 && (
+                            <span className="text-muted-foreground"> — {(m.criteria || []).length} criteria</span>
+                          )}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-muted-foreground text-sm">Scoring Mode</h3>
+                    <p>
+                      {watchedValues.scoringMode === "company_only" && "Company Only"}
+                      {watchedValues.scoringMode === "evaluator_only" && "Evaluator Only"}
+                      {watchedValues.scoringMode === "average" && "Average Both"}
+                    </p>
                   </div>
                 </div>
 
