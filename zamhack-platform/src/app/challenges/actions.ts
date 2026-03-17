@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server"
 import { revalidatePath } from "next/cache"
+import { getFinalScore, type ScoringMode } from "@/lib/scoring-utils"
 
 // --- ACTION: JOIN CHALLENGE ---
 export async function joinChallenge(challengeId: string, teamId?: string, forceJoin: boolean = false) {
@@ -160,10 +161,10 @@ export async function closeChallenge(challengeId: string): Promise<{ success: bo
     return { success: false, error: "Only company admins can close challenges." }
   }
 
-  // 2. Fetch challenge — verify org ownership and check perpetual flag
+  // 2. Fetch challenge — verify org ownership, check perpetual flag, and get scoring_mode
   const { data: challenge } = await (supabase
     .from("challenges")
-    .select("organization_id, is_perpetual")
+    .select("organization_id, is_perpetual, scoring_mode")
     .eq("id", challengeId)
     .single() as any)
 
@@ -172,6 +173,7 @@ export async function closeChallenge(challengeId: string): Promise<{ success: bo
   }
 
   const isPerpetual: boolean = challenge.is_perpetual === true
+  const scoringMode: ScoringMode = (challenge.scoring_mode || "company_only") as ScoringMode
 
   // 3. Perpetual — just close, skip winner calculation
   if (isPerpetual) {
@@ -196,7 +198,8 @@ export async function closeChallenge(challengeId: string): Promise<{ success: bo
       user_id,
       submissions (
         evaluations (
-          score
+          score,
+          profiles (role)
         )
       )
     `)
@@ -206,7 +209,17 @@ export async function closeChallenge(challengeId: string): Promise<{ success: bo
 
   const leaderboard = participants.map((p: any) => {
     const totalScore = p.submissions.reduce((acc: number, sub: any) => {
-      return acc + (sub.evaluations?.[0]?.score || 0)
+      const evals = (sub.evaluations || []) as Array<{ score: number | null; profiles: { role: string } | null }>
+      const companyEval = evals.find(e =>
+        e.profiles?.role === "company_admin" || e.profiles?.role === "company_member"
+      )
+      const evaluatorEval = evals.find(e => e.profiles?.role === "evaluator")
+      const final = getFinalScore({
+        companyScore: companyEval?.score ?? null,
+        evaluatorScore: evaluatorEval?.score ?? null,
+        scoringMode,
+      })
+      return acc + (final ?? 0)
     }, 0)
     return { profile_id: p.user_id, score: totalScore }
   })
@@ -265,10 +278,10 @@ export async function recalculateWinners(challengeId: string): Promise<{ success
     return { success: false, error: "Only company admins can recalculate winners." }
   }
 
-  // 2. Fetch challenge — verify org, status, and perpetual flag
+  // 2. Fetch challenge — verify org, status, perpetual flag, and scoring_mode
   const { data: challenge } = await (supabase
     .from("challenges")
-    .select("organization_id, status, is_perpetual")
+    .select("organization_id, status, is_perpetual, scoring_mode")
     .eq("id", challengeId)
     .single() as any)
 
@@ -285,7 +298,9 @@ export async function recalculateWinners(challengeId: string): Promise<{ success
     return { success: false, error: "Can only recalculate winners for closed challenges." }
   }
 
-  // 3. Fetch participants
+  const scoringMode: ScoringMode = (challenge.scoring_mode || "company_only") as ScoringMode
+
+  // 3. Fetch participants with evaluations and reviewer roles
   const { data: participants } = await supabase
     .from("challenge_participants")
     .select(`
@@ -293,7 +308,8 @@ export async function recalculateWinners(challengeId: string): Promise<{ success
       user_id,
       submissions (
         evaluations (
-          score
+          score,
+          profiles (role)
         )
       )
     `)
@@ -303,10 +319,20 @@ export async function recalculateWinners(challengeId: string): Promise<{ success
     return { success: false, error: "No participants found for this challenge." }
   }
 
-  // 4. Recalculate leaderboard
+  // 4. Recalculate leaderboard using scoring_mode
   const leaderboard = participants.map((p: any) => {
     const totalScore = p.submissions.reduce((acc: number, sub: any) => {
-      return acc + (sub.evaluations?.[0]?.score || 0)
+      const evals = (sub.evaluations || []) as Array<{ score: number | null; profiles: { role: string } | null }>
+      const companyEval = evals.find(e =>
+        e.profiles?.role === "company_admin" || e.profiles?.role === "company_member"
+      )
+      const evaluatorEval = evals.find(e => e.profiles?.role === "evaluator")
+      const final = getFinalScore({
+        companyScore: companyEval?.score ?? null,
+        evaluatorScore: evaluatorEval?.score ?? null,
+        scoringMode,
+      })
+      return acc + (final ?? 0)
     }, 0)
     return { profile_id: p.user_id, score: totalScore }
   })

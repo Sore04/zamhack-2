@@ -80,6 +80,11 @@ export default function EditChallengeForm({
   const [entryFee, setEntryFee] = useState<number>(challenge.entry_fee_amount ?? 0);
   const [currency, setCurrency] = useState<string>(challenge.currency ?? "PHP");
 
+  // Scoring mode
+  const [scoringMode, setScoringMode] = useState<"company_only" | "evaluator_only" | "average">(
+    challenge.scoring_mode ?? "company_only"
+  );
+
   // Milestones
   const [milestones, setMilestones] = useState<MilestoneInput[]>(
     (challenge.milestones ?? [])
@@ -146,6 +151,7 @@ export default function EditChallengeForm({
         is_perpetual: isPerpetual,
         location_type: locationType || null,
         location_details: locationType === "onsite" ? locationDetails : null,
+        scoring_mode: scoringMode,
         milestones,
       });
 

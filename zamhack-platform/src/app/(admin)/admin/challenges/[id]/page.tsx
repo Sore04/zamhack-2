@@ -6,6 +6,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { approveChallenge, rejectChallenge, approvePendingEdit, rejectPendingEdit } from "@/app/admin/actions"
 import { ArrowLeft, CheckCircle, XCircle, Clock } from "lucide-react"
+import EvaluatorAssignmentPanel from "@/components/admin/evaluator-assignment-panel"
 
 export default async function AdminChallengeDetailsPage({
   params,
@@ -31,6 +32,26 @@ export default async function AdminChallengeDetailsPage({
     .eq("challenge_id", id)
     .eq("status", "pending")
     .order("created_at", { ascending: false })
+
+  // Fetch current evaluator assignments for this challenge
+  const { data: evaluatorAssignments } = await supabase
+    .from("challenge_evaluators")
+    .select("evaluator_id, review_deadline, assigned_at, profiles(first_name, last_name)")
+    .eq("challenge_id", id)
+
+  // Fetch all available evaluator accounts
+  const { data: allEvaluators } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name")
+    .eq("role", "evaluator")
+    .order("first_name", { ascending: true })
+
+  const currentAssignments = (evaluatorAssignments || []).map((a: any) => ({
+    evaluator_id: a.evaluator_id,
+    review_deadline: a.review_deadline,
+    assigned_at: a.assigned_at,
+    profile: a.profiles ?? null,
+  }))
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A"
@@ -234,6 +255,13 @@ export default async function AdminChallengeDetailsPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Evaluator Assignments */}
+      <EvaluatorAssignmentPanel
+        challengeId={id}
+        currentAssignments={currentAssignments}
+        availableEvaluators={allEvaluators || []}
+      />
 
       {/* Challenge Content Preview */}
       <div className="grid gap-6">

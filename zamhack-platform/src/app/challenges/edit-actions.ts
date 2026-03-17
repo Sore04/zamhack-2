@@ -35,6 +35,7 @@ export type UpdateChallengeInput = {
   is_perpetual: boolean;
   location_type: "online" | "onsite" | null;
   location_details: string | null;
+  scoring_mode: "company_only" | "evaluator_only" | "average";
   milestones: MilestoneInput[];
 };
 
@@ -93,6 +94,7 @@ export async function updateChallenge(
         is_perpetual: data.is_perpetual,
         location_type: data.location_type,
         location_details: data.location_type === "onsite" ? data.location_details : null,
+        scoring_mode: data.scoring_mode,
         updated_at: new Date().toISOString(),
       } as any)
       .eq("id", challengeId)

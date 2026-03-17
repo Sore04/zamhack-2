@@ -27,6 +27,8 @@ export async function GET() {
       ? '/company/dashboard'
       : profile?.role === 'admin'
       ? '/admin/dashboard'
+      : profile?.role === 'evaluator'
+      ? '/evaluator/dashboard'
       : '/dashboard'
   })
 }

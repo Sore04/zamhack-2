@@ -9,6 +9,7 @@ import { SubmissionForm } from "@/components/submission-form"
 import { RubricCriteriaCard } from "@/components/rubric-criteria-card"
 import { AlertCircle, CheckCircle2, Lock, MessageSquare } from "lucide-react"
 import Link from "next/link"
+import { computeFinalScore, splitEvaluationsByRole, type ScoringMode } from "@/lib/scoring-utils"
 
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
 type Organization = Database["public"]["Tables"]["organizations"]["Row"]
@@ -25,8 +26,12 @@ interface ChallengeProgressData {
   milestones: Milestone[]
   participant: ChallengeParticipant
   submissions: Submission[]
-  evaluations: Evaluation[]
+  evaluations: EvaluationWithRole[]
   rubrics: Rubric[]
+}
+
+interface EvaluationWithRole extends Evaluation {
+  reviewer_role: string | null
 }
 
 type MilestoneStatus = "completed" | "in_progress" | "locked"
@@ -34,7 +39,11 @@ type MilestoneStatus = "completed" | "in_progress" | "locked"
 interface MilestoneWithStatus extends Milestone {
   status: MilestoneStatus
   submission: Submission | null
-  evaluation: Evaluation | null
+  companyEval: EvaluationWithRole | null
+  evaluatorEval: EvaluationWithRole | null
+  finalScore: number | null
+  finalScoreLabel: string
+  isFallback: boolean
 }
 
 async function getChallengeProgress(
@@ -99,21 +108,24 @@ async function getChallengeProgress(
     console.error("Error fetching submissions:", submissionsError)
   }
 
-  // Fetch evaluations for these submissions
+  // Fetch evaluations for these submissions — join reviewer role for scoring_mode logic
   const submissionIds = submissions?.map((s) => s.id) || []
-  let evaluations: Evaluation[] = []
+  let evaluations: EvaluationWithRole[] = []
 
   if (submissionIds.length > 0) {
     const { data: evals, error: evaluationsError } = await supabase
       .from("evaluations")
-      .select("*")
+      .select("*, profiles(role)")
       .in("submission_id", submissionIds)
       .eq("is_draft", false)
 
     if (evaluationsError) {
       console.error("Error fetching evaluations:", evaluationsError)
     } else {
-      evaluations = evals || []
+      evaluations = (evals || []).map((e: any) => ({
+        ...e,
+        reviewer_role: e.profiles?.role ?? null,
+      }))
     }
   }
 
@@ -186,13 +198,16 @@ export default async function ChallengeProgressPage({
     }
   })
 
-  // Create a map of submission_id -> evaluation
-  const evaluationMap = new Map<string, Evaluation>()
-  evaluations.forEach((evaluationItem) => {
-    if (evaluationItem.submission_id) {
-      evaluationMap.set(evaluationItem.submission_id, evaluationItem)
+  // Group evaluations by submission_id (multiple per submission now)
+  const evaluationsBySubmission = new Map<string, EvaluationWithRole[]>()
+  evaluations.forEach((e) => {
+    if (e.submission_id) {
+      const existing = evaluationsBySubmission.get(e.submission_id) || []
+      evaluationsBySubmission.set(e.submission_id, [...existing, e])
     }
   })
+
+  const scoringMode = ((challenge as any).scoring_mode || "company_only") as ScoringMode
 
   // Determine milestone statuses
   const milestonesWithStatus: MilestoneWithStatus[] = []
@@ -200,12 +215,15 @@ export default async function ChallengeProgressPage({
 
   for (const milestone of milestones) {
     const submission = submissionMap.get(milestone.id) || null
-    const evaluation = submission
-      ? evaluationMap.get(submission.id) || null
-      : null
+    const subEvals = submission ? (evaluationsBySubmission.get(submission.id) || []) : []
+    const { companyEval, evaluatorEval } = splitEvaluationsByRole(subEvals)
+    const { finalScore, label, isFallback } = computeFinalScore({
+      companyScore: companyEval?.score ?? null,
+      evaluatorScore: evaluatorEval?.score ?? null,
+      scoringMode,
+    })
 
     let status: MilestoneStatus = "locked"
-
     if (submission) {
       status = "completed"
     } else if (!foundInProgress) {
@@ -217,7 +235,11 @@ export default async function ChallengeProgressPage({
       ...milestone,
       status,
       submission,
-      evaluation,
+      companyEval,
+      evaluatorEval,
+      finalScore,
+      finalScoreLabel: label,
+      isFallback,
     })
   }
 
@@ -374,46 +396,87 @@ export default async function ChallengeProgressPage({
                   )}
 
                   {/* Show feedback for completed milestones */}
-                  {milestone.status === "completed" &&
-                    milestone.submission &&
-                    milestone.evaluation && (
-                      <Card className="bg-muted/50">
-                        <CardHeader>
-                          <CardTitle className="text-base">Feedback</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          {milestone.evaluation.score !== null && (
-                            <div>
-                              <span className="text-sm font-medium">Score: </span>
-                              <Badge variant="default">
-                                {milestone.evaluation.score}/100
-                              </Badge>
+                  {milestone.status === "completed" && milestone.submission && (
+                    <>
+                      {(milestone.companyEval || milestone.evaluatorEval) ? (
+                        <Card className="bg-muted/50">
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base">Feedback</CardTitle>
+                              {milestone.finalScore !== null && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">
+                                    {milestone.finalScoreLabel}
+                                    {milestone.isFallback && " ·  interim"}
+                                  </span>
+                                  <Badge variant="default">
+                                    {milestone.finalScore}/100
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {milestone.evaluation.feedback && (
-                            <div>
-                              <p className="text-sm font-medium mb-1">Feedback:</p>
-                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {milestone.evaluation.feedback}
-                              </p>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            {/* Company feedback */}
+                            {milestone.companyEval && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                  {scoringMode === "evaluator_only"
+                                    ? "Company Feedback (advisory)"
+                                    : "Company Feedback"}
+                                </p>
+                                {milestone.companyEval.score !== null && scoringMode !== "evaluator_only" && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">Score:</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {milestone.companyEval.score}/100
+                                    </Badge>
+                                  </div>
+                                )}
+                                {milestone.companyEval.feedback && (
+                                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                    {milestone.companyEval.feedback}
+                                  </p>
+                                )}
+                              </div>
+                            )}
 
-                  {/* Show submission info if submitted but no feedback yet */}
-                  {milestone.status === "completed" &&
-                    milestone.submission &&
-                    !milestone.evaluation && (
-                      <Card className="bg-muted/50">
-                        <CardContent className="pt-6">
-                          <p className="text-sm text-muted-foreground">
-                            Submission received. Waiting for feedback...
-                          </p>
-                        </CardContent>
-                      </Card>
-                    )}
+                            {/* Evaluator feedback */}
+                            {milestone.evaluatorEval && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                  {scoringMode === "company_only"
+                                    ? "Expert Feedback (advisory)"
+                                    : "Expert Feedback"}
+                                </p>
+                                {milestone.evaluatorEval.score !== null && scoringMode !== "company_only" && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">Score:</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {milestone.evaluatorEval.score}/100
+                                    </Badge>
+                                  </div>
+                                )}
+                                {milestone.evaluatorEval.feedback && (
+                                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                    {milestone.evaluatorEval.feedback}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <Card className="bg-muted/50">
+                          <CardContent className="pt-6">
+                            <p className="text-sm text-muted-foreground">
+                              Submission received. Waiting for feedback...
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
