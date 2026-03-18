@@ -143,7 +143,7 @@ export default async function MyChallengesPage() {
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {activeChallenges.map((challenge) => (
-                  <ChallengeCard key={challenge.id} challenge={challenge} />
+                  <ChallengeCard key={challenge.id} challenge={challenge} isParticipant={true} />
                 ))}
               </div>
             )}
@@ -164,7 +164,7 @@ export default async function MyChallengesPage() {
                     <ChallengeCard
                       key={challenge.id}
                       challenge={challenge}
-                      // Perpetual + completed → card links to perpetual results page
+                      isParticipant={true}
                       perpetualResultsHref={
                         isPerpetual && isCompleted
                           ? `/challenges/${challenge.id}`

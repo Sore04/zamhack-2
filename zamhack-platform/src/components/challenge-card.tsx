@@ -26,6 +26,11 @@ interface ChallengeCardProps {
    * "View Results" and links to this href instead of the default challenge page.
    */
   perpetualResultsHref?: string
+  /**
+   * When true, the CTA links to /my-challenges/[id] instead of /challenges/[id]
+   * so the student sees their progress page with feedback.
+   */
+  isParticipant?: boolean
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -105,7 +110,7 @@ function orgAccentClass(name: string | undefined | null): string {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function ChallengeCard({ challenge, perpetualResultsHref }: ChallengeCardProps) {
+export function ChallengeCard({ challenge, perpetualResultsHref, isParticipant }: ChallengeCardProps) {
   const isClosed    = challenge.status === "closed" || challenge.status === "completed"
   const isCancelled = challenge.status === "cancelled"
   const isPerpetual = (challenge as any).is_perpetual === true
@@ -118,7 +123,8 @@ export function ChallengeCard({ challenge, perpetualResultsHref }: ChallengeCard
   const accentClass = orgAccentClass(challenge.organization?.name)
 
   // Decide where the CTA links and what it says
-  const ctaHref = perpetualResultsHref ?? `/challenges/${challenge.id}`
+  const ctaHref = perpetualResultsHref
+    ?? (isParticipant ? `/my-challenges/${challenge.id}` : `/challenges/${challenge.id}`)
 
   const ctaContent = (() => {
     if (isPerpetualCompleted) {
@@ -141,7 +147,7 @@ export function ChallengeCard({ challenge, perpetualResultsHref }: ChallengeCard
       }
     }
     return {
-      label: <>View Details <ArrowRight size={14} /></>,
+      label: <>{isParticipant ? "View Progress" : "View Details"} <ArrowRight size={14} /></>,
       className: "cc-cta cc-cta-primary",
     }
   })()
