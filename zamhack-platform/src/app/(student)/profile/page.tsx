@@ -25,7 +25,7 @@ async function getProfileData() {
     { data: profile },
     { data: studentSkillsRaw },
     { data: allSkills },
-    { data: earnedParticipants },
+    { data: earnedSkillsRaw },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
 
@@ -39,23 +39,12 @@ async function getProfileData() {
       .select("id, name, category")
       .order("name"),
 
-    supabase
-      .from("challenge_participants")
-      .select("challenges(challenge_skills(skills(id, name, category)))")
+    (supabase
+      .from("student_earned_skills")
+      .select("id, tier, source, awarded_at, skill:skills(id, name, category), challenge:challenges(id, title)")
       .eq("profile_id", user.id)
-      .eq("status", "completed"),
+      .order("awarded_at", { ascending: false }) as any),
   ])
-
-  // Flatten and deduplicate challenge-earned skills
-  const earnedSkillMap = new Map<string, { id: string; name: string; category: string | null }>()
-  for (const p of earnedParticipants ?? []) {
-    for (const cs of (p.challenges as any)?.challenge_skills ?? []) {
-      const s = cs.skills
-      if (s?.id && !earnedSkillMap.has(s.id)) {
-        earnedSkillMap.set(s.id, { id: s.id, name: s.name, category: s.category ?? null })
-      }
-    }
-  }
 
   return {
     profile: profile as Profile | null,
@@ -66,7 +55,14 @@ async function getProfileData() {
       skill: { id: string; name: string; category: string | null }
     }>,
     allSkills: (allSkills ?? []) as Array<{ id: string; name: string; category: string | null }>,
-    earnedSkills: [...earnedSkillMap.values()],
+    earnedSkills: (earnedSkillsRaw ?? []) as Array<{
+      id: string
+      tier: "beginner" | "intermediate" | "advanced"
+      source: "challenge" | "admin"
+      awarded_at: string | null
+      skill: { id: string; name: string; category: string | null } | null
+      challenge: { id: string; title: string } | null
+    }>,
   }
 }
 

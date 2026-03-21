@@ -35,17 +35,20 @@ type StudentSkill = {
   skill: Skill
 }
 
-type ChallengeEarnedSkill = {
+type EarnedSkill = {
   id: string
-  name: string
-  category: string | null
+  tier: "beginner" | "intermediate" | "advanced"
+  source: "challenge" | "admin"
+  awarded_at: string | null
+  skill: Skill | null
+  challenge: { id: string; title: string } | null
 }
 
 type Props = {
   studentId: string
   initialSkills: StudentSkill[]
   availableSkills: Skill[]
-  earnedSkills: ChallengeEarnedSkill[]
+  earnedSkills: EarnedSkill[]
 }
 
 const LEVEL_LABELS: Record<ProficiencyLevel, string> = {
@@ -208,27 +211,49 @@ export const SkillsSection = ({ studentId, initialSkills, availableSkills, earne
         </div>
       </div>
 
-      {/* Earned from Challenges Card */}
-      {earnedSkills.length > 0 && (
-        <div className="pf-card">
-          <div className="pf-card-header">
-            <div className="pf-card-icon">
-              <Star size={15} />
-            </div>
-            <h2 className="pf-card-title">Earned from Challenges</h2>
-          </div>
-          <div className="pf-card-body">
-            <p className="pf-skills-earned-desc">Skills gained through completed challenges.</p>
-            <div className="pf-skills-tags" style={{ marginTop: "0.5rem" }}>
-              {earnedSkills.map((s) => (
-                <span key={s.id} className="pf-skill-tag pf-skill-tag-earned">
-                  {s.name}
-                </span>
-              ))}
-            </div>
-          </div>
+      {/* Challenge-Verified Earned Skills Card */}
+      <div id="earned-skills" className="pf-card">
+        <div className="pf-card-header">
+          <div className="pf-card-icon"><Star size={15} /></div>
+          <h2 className="pf-card-title">Challenge-Verified Skills</h2>
         </div>
-      )}
+        <div className="pf-card-body">
+          {earnedSkills.length === 0 ? (
+            <p className="pf-empty">
+              No earned skills yet. Complete challenges to earn verified skills that unlock gated challenges.
+            </p>
+          ) : (
+            <>
+              <p className="pf-skills-earned-desc">Skills earned by completing challenges. These unlock participation in gated challenges.</p>
+              <div className="pf-skills-groups" style={{ marginTop: "0.75rem" }}>
+                {(["beginner", "intermediate", "advanced"] as const).map((tier) => {
+                  const group = earnedSkills.filter((s) => s.tier === tier && s.skill)
+                  if (group.length === 0) return null
+                  return (
+                    <div key={tier} className="pf-skills-group">
+                      <span className="pf-skills-level-label">{LEVEL_LABELS[tier as keyof typeof LEVEL_LABELS]}</span>
+                      <div className="pf-skills-tags">
+                        {group.map((s) => (
+                          <span
+                            key={s.id}
+                            className={`pf-skill-tag pf-skill-tag-${tier}`}
+                            title={s.source === "admin" ? "Granted by Admin" : s.challenge ? `Earned from: ${s.challenge.title}` : undefined}
+                          >
+                            {s.skill!.name}
+                            {s.source === "admin" && (
+                              <span style={{ fontSize: "0.65rem", opacity: 0.7, marginLeft: 3 }}>★</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Add Skill Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

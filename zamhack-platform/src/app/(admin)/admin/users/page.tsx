@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server"
 import { redirect } from "next/navigation"
 import { Database } from "@/types/supabase"
 import { UserActionsCell } from "./user-actions-cell"
+import { GrantSkillButton } from "./grant-skill-button"
 import { Users, GraduationCap, Building2, ShieldCheck, Search, ClipboardList } from "lucide-react"
 import "@/app/(admin)/admin.css"
 import CreateEvaluatorButton from "./create-evaluator-button"
@@ -39,15 +40,22 @@ export default async function AdminUsersPage({
 
   if (currentUserProfile?.role !== "admin") redirect("/dashboard")
 
-  // Fetch all profiles with org name
-  const { data: profiles, error } = await supabase
-    .from("profiles")
-    .select(`*, organization:organizations(name)`)
-    .order("created_at", { ascending: false })
+  // Fetch all profiles with org name + all skills for grant dialog
+  const [{ data: profiles, error }, { data: allSkills }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(`*, organization:organizations(name)`)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("skills")
+      .select("id, name, category")
+      .order("name"),
+  ])
 
   if (error) console.error(error)
 
   const allProfiles = (profiles || []) as Profile[]
+  const skillsList = (allSkills || []) as Array<{ id: string; name: string; category: string | null }>
 
   // --- Active filter values ---
   const activeTab   = params.tab || "all"
@@ -367,7 +375,10 @@ export default async function AdminUsersPage({
                         </td>
 
                         <td style={{ textAlign: "right" }}>
-                          <UserActionsCell userId={profile.id} status={userProfile.status} />
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.375rem" }}>
+                            <GrantSkillButton userId={profile.id} role={profile.role} skills={skillsList} />
+                            <UserActionsCell userId={profile.id} status={userProfile.status} />
+                          </div>
                         </td>
                       </tr>
                     )

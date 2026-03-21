@@ -3,6 +3,8 @@
 import { createClient } from "@/utils/supabase/server"
 import { revalidatePath } from "next/cache"
 import { getFinalScore, type ScoringMode } from "@/lib/scoring-utils"
+import { checkParticipationGate } from "@/lib/participation-gate"
+import { awardChallengeSkills } from "@/lib/award-skills"
 
 // --- ACTION: JOIN CHALLENGE ---
 export async function joinChallenge(challengeId: string, teamId?: string, forceJoin: boolean = false) {
@@ -13,7 +15,7 @@ export async function joinChallenge(challengeId: string, teamId?: string, forceJ
 
   const { data: targetChallenge, error: fetchError } = await (supabase
     .from("challenges")
-    .select("title, start_date, end_date, status, registration_deadline, is_perpetual")
+    .select("title, start_date, end_date, status, registration_deadline, is_perpetual, difficulty, challenge_skills(skill_id)")
     .eq("id", challengeId)
     .single() as any)
 
@@ -95,6 +97,24 @@ export async function joinChallenge(challengeId: string, teamId?: string, forceJ
     }
   }
 
+  // --- PARTICIPATION GATE ---
+  const gateResult = await checkParticipationGate(supabase, challengeId, user.id)
+  if (!gateResult.allowed) {
+    if (gateResult.reason === "advanced_limit") {
+      return {
+        error: "advanced_limit",
+        nextEligibleAt: gateResult.nextEligibleAt,
+        effectiveLimit: gateResult.effectiveLimit,
+      }
+    }
+    return {
+      error: "skill_gate",
+      requiredSkillIds: gateResult.missingSkillIds,
+      requiredTier: gateResult.requiredTier,
+      difficulty: gateResult.difficulty,
+    }
+  }
+
   const { error: joinError } = await supabase
     .from("challenge_participants")
     .insert({
@@ -161,10 +181,10 @@ export async function closeChallenge(challengeId: string): Promise<{ success: bo
     return { success: false, error: "Only company admins can close challenges." }
   }
 
-  // 2. Fetch challenge — verify org ownership, check perpetual flag, and get scoring_mode
+  // 2. Fetch challenge — verify org ownership, check perpetual flag, difficulty, and scoring_mode
   const { data: challenge } = await (supabase
     .from("challenges")
-    .select("organization_id, is_perpetual, scoring_mode")
+    .select("organization_id, is_perpetual, scoring_mode, difficulty")
     .eq("id", challengeId)
     .single() as any)
 
@@ -249,6 +269,17 @@ export async function closeChallenge(challengeId: string): Promise<{ success: bo
     .eq("id", challengeId)
 
   if (updateError) return { success: false, error: "Failed to close challenge." }
+
+  // Award earned skills to all active participants (upgrade-safe)
+  const { data: activeParticipants } = await supabase
+    .from("challenge_participants")
+    .select("user_id")
+    .eq("challenge_id", challengeId)
+    .eq("status", "active")
+
+  for (const p of activeParticipants ?? []) {
+    if (p.user_id) await awardChallengeSkills(supabase, challengeId, p.user_id, scoringMode)
+  }
 
   revalidatePath(`/challenges/${challengeId}`)
   revalidatePath(`/company/challenges/${challengeId}`)

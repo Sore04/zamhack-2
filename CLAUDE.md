@@ -53,7 +53,7 @@ Supabase clients:
 
 ### Key Database Tables
 
-`profiles`, `organizations`, `challenges`, `milestones`, `challenge_participants`, `submissions`, `evaluations`, `teams`, `challenge_evaluators`, `support_tickets`
+`profiles`, `organizations`, `challenges`, `milestones`, `challenge_participants`, `submissions`, `evaluations`, `teams`, `challenge_evaluators`, `support_tickets`, `student_earned_skills`, `challenge_skills`, `skills`, `student_skills`, `rubrics`, `scores`, `winners`, `payments`, `platform_settings`, `challenge_pending_edits`
 
 ### Component Conventions
 
@@ -108,6 +108,87 @@ After running the migration, regenerate TypeScript types: `supabase gen types ty
 - Grading: `submissions/[submissionId]/page.tsx` filters rubrics by `milestone_id` (with challenge-level fallback) before passing to `GradingForm`.
 
 **`any` casts:** Because the `milestone_id` column is not yet in the auto-generated `src/types/supabase.ts` until types are regenerated, Supabase insert/filter calls that reference `milestone_id` use `as any` casts. Remove these casts after type regeneration.
+
+### Participation Gate System
+
+Controls which students can join challenges based on difficulty. Implemented in `src/lib/participation-gate.ts`.
+
+**Gate rules:**
+- `beginner` challenges — open to everyone by default (cold-start rule), but subject to the Advanced Student Guardrail (see below)
+- `intermediate` challenges — student must have at least one matching skill (from `challenge_skills`) earned at any tier in `student_earned_skills`
+- `advanced` challenges — student must have at least one matching skill earned at `intermediate` or `advanced` tier
+
+If a challenge has no rows in `challenge_skills`, the gate is skipped entirely.
+
+**Where it's enforced:**
+1. `joinChallenge()` in `src/app/challenges/actions.ts` — calls `checkParticipationGate()` before inserting the participant row
+2. `src/app/(student)/challenges/[id]/page.tsx` — server-side pre-check; renders a locked button instead of Join if blocked
+
+**Gate utility:** `src/lib/participation-gate.ts` — exports `checkParticipationGate(supabase, challengeId, profileId): Promise<GateResult>`. Returns `{ allowed: true }` or one of two failure shapes:
+- `{ allowed: false, reason: "skill_gate", requiredTier, difficulty, missingSkillIds }` — missing required skill
+- `{ allowed: false, reason: "advanced_limit", nextEligibleAt, effectiveLimit }` — weekly beginner limit reached
+
+**Skill gate page:** `src/app/(student)/challenges/[id]/skill-gate/page.tsx` — shown when a student is blocked by `skill_gate`. Displays missing skills and lists beginner/intermediate challenges that award those skills as a progression path.
+
+### Advanced Student Guardrail
+
+Prevents advanced-tier students from repeatedly joining beginner challenges and crowding out newer students. Enforced inside `checkParticipationGate()` as part of the beginner branch.
+
+**How the check works:**
+1. Extract `challenge_skills` from the beginner challenge. If none exist → skip (can't determine overqualification).
+2. Read `advanced_beginner_weekly_limit` from `platform_settings` (global setting, admin-configurable). If null → guardrail disabled.
+3. Check if the student has any of the challenge's specific skills at `advanced` tier in `student_earned_skills`. If not → allow freely.
+4. Find all challenge IDs that share those same advanced skills (via `challenge_skills` table).
+5. Count how many of those beginner challenges the student joined in the past 7 days (rolling window). If count ≥ limit → block with `advanced_limit`.
+
+**Key behaviour:**
+- The counter is skill-scoped: joining a beginner Python challenge only counts toward the Python limit, not a C++ limit.
+- A student with advanced Python trying to join a beginner C++ challenge (which they don't hold at advanced) is never affected.
+- `nextEligibleAt` = earliest qualifying `joined_at` in the window + 7 days.
+
+**Admin configuration:** `src/app/(admin)/admin/challenges/page.tsx` has a **Guardrails** tab. The form (`guardrails-form.tsx`) lets admins set `advanced_beginner_weekly_limit` via `updateGuardrailLimit()` in `src/app/admin/actions.ts`. Stored in the `platform_settings` singleton row.
+
+**Database migration required:**
+```sql
+ALTER TABLE public.platform_settings
+ADD COLUMN IF NOT EXISTS advanced_beginner_weekly_limit integer DEFAULT 1;
+
+-- Required so students can read the limit during join checks (RLS)
+CREATE POLICY "authenticated users can read platform settings"
+ON public.platform_settings FOR SELECT TO authenticated USING (true);
+```
+
+**Student UI:** `src/app/(student)/challenges/[id]/page.tsx` renders a disabled "Weekly limit reached" button with the next eligible date when `gateStatus.reason === "advanced_limit"`.
+
+### Skill Award System
+
+Students earn skills from `challenge_skills` into `student_earned_skills` upon challenge completion. Tier is determined by the challenge's `difficulty` column. Implemented in `src/lib/award-skills.ts`.
+
+**Upgrade-only rule:** A student's tier for a skill can only increase (`beginner → intermediate → advanced`), never decrease. The utility fetches the existing row and skips the write if `TIER_RANK[new] <= TIER_RANK[existing]`.
+
+**When skills are awarded:**
+- **Normal challenges:** `closeChallenge()` in `src/app/challenges/actions.ts` loops over all `active` participants and calls `awardChallengeSkills()` for each.
+- **Perpetual challenges:** `submitMilestone()` in `src/app/challenges/submission-actions.ts` checks after each submission whether all milestones are now submitted. If so, calls `awardChallengeSkills()` immediately — no close event needed.
+- **Admin grant:** Admin user management panel can manually grant skills (sets `source = 'admin'`).
+
+**Skill award utility:** `src/lib/award-skills.ts` — exports `awardChallengeSkills(supabase, challengeId, profileId)`. Handles per-skill upgrade logic with individual fetches and updates.
+
+**`student_earned_skills` vs `student_skills`:**
+- `student_skills` — self-reported portfolio skills (student adds manually, max 15 total)
+- `student_earned_skills` — earned via challenges, unique `(profile_id, skill_id)` with an upgradeable `tier`
+
+**Profile display:** Earned skills are shown on the student profile page (`src/app/(student)/profile/page.tsx`) via `src/components/profile/skills-section.tsx`, grouped by tier.
+
+**Admin grant UI:** `src/app/(admin)/admin/users/grant-skill-button.tsx` — rendered per student card in the User Management page. Calls `grantEarnedSkill(profileId, skillId, tier)` in `src/app/admin/actions.ts`. Sets `source = 'admin'` on the inserted row.
+
+### Scoring Mode
+
+`challenges.scoring_mode` determines which evaluations count toward winner calculation:
+- `company_only` — only company reviewer scores
+- `evaluator_only` — only external evaluator scores
+- `average` — average of both
+
+Logic in `src/lib/scoring-utils.ts` (`getFinalScore`). Used in `closeChallenge()` and `recalculateWinners()`.
 
 ## Environment Variables
 

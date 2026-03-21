@@ -595,6 +595,7 @@ export type Database = {
       }
       platform_settings: {
         Row: {
+          advanced_beginner_weekly_limit: number | null
           allow_new_signups: boolean | null
           default_currency: string | null
           id: boolean
@@ -602,6 +603,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          advanced_beginner_weekly_limit?: number | null
           allow_new_signups?: boolean | null
           default_currency?: string | null
           id?: boolean
@@ -609,6 +611,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          advanced_beginner_weekly_limit?: number | null
           allow_new_signups?: boolean | null
           default_currency?: string | null
           id?: boolean
@@ -816,6 +819,58 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      student_earned_skills: {
+        Row: {
+          id: string
+          profile_id: string
+          skill_id: string
+          tier: "beginner" | "intermediate" | "advanced"
+          source: "challenge" | "admin"
+          challenge_id: string | null
+          awarded_at: string | null
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          skill_id: string
+          tier: "beginner" | "intermediate" | "advanced"
+          source?: "challenge" | "admin"
+          challenge_id?: string | null
+          awarded_at?: string | null
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          skill_id?: string
+          tier?: "beginner" | "intermediate" | "advanced"
+          source?: "challenge" | "admin"
+          challenge_id?: string | null
+          awarded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_earned_skills_profile_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_earned_skills_skill_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_earned_skills_challenge_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_skills: {
         Row: {

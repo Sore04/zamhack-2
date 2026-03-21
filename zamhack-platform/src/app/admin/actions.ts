@@ -353,6 +353,86 @@ export async function removeEvaluator(
 // EVALUATOR CREATION
 // ==========================================
 
+// ==========================================
+// EARNED SKILL GRANT (ADMIN)
+// ==========================================
+
+export async function grantEarnedSkill(
+  profileId: string,
+  skillId: string,
+  tier: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (profile?.role !== "admin") return { success: false, error: "Unauthorized" }
+
+  const validTiers = ["beginner", "intermediate", "advanced"]
+  if (!validTiers.includes(tier)) return { success: false, error: "Invalid tier" }
+
+  const { error } = await (supabase
+    .from("student_earned_skills")
+    .upsert(
+      {
+        profile_id: profileId,
+        skill_id: skillId,
+        tier: tier as "beginner" | "intermediate" | "advanced",
+        source: "admin",
+        challenge_id: null,
+      },
+      { onConflict: "profile_id,skill_id" }
+    ) as any)
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath("/admin/users")
+  revalidatePath("/profile")
+  return { success: true }
+}
+
+// ==========================================
+// GUARDRAIL SETTINGS (ADMIN)
+// ==========================================
+
+export async function updateGuardrailLimit(
+  limit: number | null
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (profile?.role !== "admin") return { success: false, error: "Unauthorized" }
+
+  if (limit !== null && (limit < 0 || !Number.isInteger(limit))) {
+    return { success: false, error: "Limit must be a non-negative integer or null" }
+  }
+
+  const { error } = await (supabase
+    .from("platform_settings")
+    .update({ advanced_beginner_weekly_limit: limit })
+    .eq("id", true) as any)
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath("/admin/challenges")
+  return { success: true }
+}
+
 export async function createEvaluator(
   email: string,
   firstName: string,

@@ -21,6 +21,7 @@ import {
 import Link from "next/link"
 import DownloadCertificateButton from "@/components/certificate/download-certificate-btn"
 import { RubricCriteriaCard } from "@/components/rubric-criteria-card"
+import { checkParticipationGate, type GateResult } from "@/lib/participation-gate"
 
 // --- Types ---
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
@@ -48,6 +49,8 @@ interface ChallengeProgressData {
   userTeam: TeamData | null
   userId: string
   studentName: string
+  gateStatus: GateResult
+  challengeSkills: Array<{ skill_id: string; skill: { id: string; name: string } | null }>
 }
 
 type MilestoneStatus = "completed" | "in_progress" | "locked"
@@ -145,6 +148,17 @@ async function getChallengeData(
       "Student"
     : "Student"
 
+  // 8. Gate status (only relevant when student hasn't joined yet)
+  const gateStatus: GateResult = participant
+    ? { allowed: true }
+    : await checkParticipationGate(supabase, id, user.id)
+
+  // 9. Challenge skills (for "Required Skills" sidebar card)
+  const { data: challengeSkillsRaw } = await (supabase
+    .from("challenge_skills")
+    .select("skill_id, skill:skills(id, name)")
+    .eq("challenge_id", id) as any)
+
   return {
     challenge: challenge as any,
     milestones: milestones || [],
@@ -155,6 +169,8 @@ async function getChallengeData(
     userTeam,
     userId: user.id,
     studentName,
+    gateStatus,
+    challengeSkills: (challengeSkillsRaw as any) ?? [],
   }
 }
 
@@ -188,6 +204,8 @@ export default async function ChallengePage({
     userTeam,
     userId,
     studentName,
+    gateStatus,
+    challengeSkills,
   } = data
 
   // --- Logic ---
@@ -426,13 +444,58 @@ export default async function ChallengePage({
                       Join for {currency} {feeAmount}
                     </Link>
                   </Button>
+                ) : !gateStatus.allowed && gateStatus.reason === "advanced_limit" ? (
+                  /* CASE 7a: Advanced weekly limit reached */
+                  <Button disabled size="lg" variant="outline" className="w-full gap-2 flex-col h-auto py-3">
+                    <span className="flex items-center gap-2">
+                      <Lock size={16} />
+                      Weekly limit reached
+                    </span>
+                    <span className="text-xs font-normal opacity-70">
+                      Next eligible: {new Date(gateStatus.nextEligibleAt).toLocaleDateString()}
+                    </span>
+                  </Button>
+                ) : !gateStatus.allowed ? (
+                  /* CASE 7b: Skill gate locked */
+                  <Button asChild size="lg" variant="outline" className="w-full gap-2">
+                    <Link
+                      href={`/challenges/${challenge.id}/skill-gate?tier=${gateStatus.requiredTier}&difficulty=${gateStatus.difficulty}`}
+                    >
+                      <Lock size={16} />
+                      Requires {gateStatus.requiredTier} credential
+                    </Link>
+                  </Button>
                 ) : (
-                  /* CASE 7: Free entry */
+                  /* CASE 8: Free entry */
                   <JoinButton challengeId={id} isFull />
                 )}
               </div>
             </CardContent>
           </Card>
+
+          {challenge.difficulty !== "beginner" && challengeSkills.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Required Skills to Join</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Requires at least a{" "}
+                  <strong>
+                    {challenge.difficulty === "advanced" ? "intermediate" : "beginner"}
+                  </strong>{" "}
+                  or higher credential:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {challengeSkills.map((cs: any) => (
+                    <Badge key={cs.skill_id} variant="secondary" className="text-xs">
+                      {cs.skill?.name ?? cs.skill_id}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

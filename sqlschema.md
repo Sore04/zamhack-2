@@ -243,6 +243,77 @@ CREATE TABLE public.winners (
   CONSTRAINT winners_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
 );
 
+-- New tables added after initial schema (run these migrations in order):
+
+CREATE TABLE public.student_earned_skills (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  profile_id uuid NOT NULL,
+  skill_id uuid NOT NULL,
+  tier USER-DEFINED NOT NULL,                        -- proficiency_level enum: beginner | intermediate | advanced
+  source text NOT NULL DEFAULT 'challenge'::text     -- 'challenge' or 'admin'
+    CHECK (source IN ('challenge', 'admin')),
+  challenge_id uuid,                                 -- the challenge that most recently set this tier
+  awarded_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT student_earned_skills_pkey PRIMARY KEY (id),
+  CONSTRAINT student_earned_skills_profile_skill_unique UNIQUE (profile_id, skill_id),
+  CONSTRAINT student_earned_skills_profile_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
+  CONSTRAINT student_earned_skills_skill_fkey FOREIGN KEY (skill_id) REFERENCES public.skills(id),
+  CONSTRAINT student_earned_skills_challenge_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id)
+);
+
+CREATE TABLE public.payments (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  challenge_id uuid NOT NULL,
+  amount numeric NOT NULL,
+  currency text NOT NULL DEFAULT 'PHP'::text,
+  provider text NOT NULL DEFAULT 'stripe'::text,
+  status text NOT NULL DEFAULT 'pending'::text
+    CHECK (status IN ('pending', 'paid', 'failed', 'refunded')),
+  checkout_session_id text,
+  payment_intent_id text,
+  paid_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT payments_pkey PRIMARY KEY (id),
+  CONSTRAINT payments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT payments_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id)
+);
+
+CREATE TABLE public.platform_settings (
+  id boolean NOT NULL DEFAULT true,                  -- singleton key; always true
+  maintenance_mode boolean DEFAULT false,
+  allow_new_signups boolean DEFAULT true,
+  default_currency text DEFAULT 'PHP'::text,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT platform_settings_pkey PRIMARY KEY (id),
+  CONSTRAINT platform_settings_singleton CHECK (id = true)
+);
+
+CREATE TABLE public.challenge_pending_edits (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  challenge_id uuid NOT NULL,
+  submitted_by uuid NOT NULL,
+  payload jsonb NOT NULL,
+  status text NOT NULL DEFAULT 'pending'::text
+    CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewed_by uuid,
+  reviewed_at timestamp with time zone,
+  admin_note text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT challenge_pending_edits_pkey PRIMARY KEY (id),
+  CONSTRAINT challenge_pending_edits_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id),
+  CONSTRAINT challenge_pending_edits_submitted_by_fkey FOREIGN KEY (submitted_by) REFERENCES public.profiles(id),
+  CONSTRAINT challenge_pending_edits_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.profiles(id)
+);
+
+-- Column added to challenges after initial schema:
+ALTER TABLE public.challenges ADD COLUMN scoring_mode text NOT NULL DEFAULT 'company_only'::text
+  CHECK (scoring_mode IN ('company_only', 'evaluator_only', 'average'));
+
+-- review_deadline added to challenge_evaluators after initial schema:
+ALTER TABLE public.challenge_evaluators ADD COLUMN review_deadline timestamp with time zone;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- IMPLEMENTATION NOTES
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -290,3 +361,45 @@ CREATE TABLE public.winners (
 
 -- platform_settings
 --   Single-row table. id column is boolean (always true) acting as a singleton key.
+
+-- student_earned_skills
+--   Tracks skills that students have earned by completing challenges (separate from
+--   student_skills which are self-reported portfolio skills).
+--   UNIQUE constraint on (profile_id, skill_id): one row per student per skill.
+--   Tier is upgraded in-place via src/lib/award-skills.ts — never downgraded.
+--   Tier rank: beginner(1) < intermediate(2) < advanced(3). Only writes if new rank > existing rank.
+--
+--   When awarded (normal challenges):
+--     closeChallenge() in src/app/challenges/actions.ts loops over active participants
+--     and calls awardChallengeSkills(supabase, challengeId, profileId) for each.
+--
+--   When awarded (perpetual challenges):
+--     submitMilestone() in src/app/challenges/submission-actions.ts checks if all milestones
+--     are now submitted after each submission. If yes, calls awardChallengeSkills() immediately.
+--     No close event is needed for perpetual challenges.
+--
+--   When awarded (admin):
+--     Admin user management panel can manually grant skills (source = 'admin').
+
+-- challenge_skills + student_earned_skills = participation gate
+--   Enforced in src/lib/participation-gate.ts (checkParticipationGate):
+--     beginner challenge   → no gate (anyone can join)
+--     intermediate challenge → student must have ≥1 matching challenge_skill earned at any tier
+--     advanced challenge    → student must have ≥1 matching challenge_skill earned at intermediate or advanced
+--   "Matching" means the skill_id appears in both challenge_skills and student_earned_skills for that student.
+--   If the challenge has no rows in challenge_skills, the gate is skipped.
+--   Gate is checked:
+--     1. Server-side on the challenge detail page (pre-rendered locked button)
+--     2. In joinChallenge() server action before inserting challenge_participants row
+
+-- challenges.scoring_mode
+--   Determines which evaluations count toward the final score used in winner calculation:
+--     company_only   → only evaluations from company_admin / company_member reviewers
+--     evaluator_only → only evaluations from evaluator role profiles
+--     average        → average of company and evaluator scores
+--   Used in src/lib/scoring-utils.ts (getFinalScore) and in closeChallenge / recalculateWinners.
+
+-- payments
+--   Created when a student initiates checkout for a paid challenge (entry_fee_amount > 0).
+--   status transitions: pending → paid (on webhook) | failed | refunded
+--   Student is enrolled in challenge_participants only after status = 'paid'.

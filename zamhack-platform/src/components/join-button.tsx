@@ -35,7 +35,14 @@ export function JoinButton({ challengeId, isFull = false }: JoinButtonProps) {
       // FIX: Pass undefined for teamId so force becomes the third parameter
       const result = await joinChallenge(challengeId, undefined, force)
 
-      if (result.error) {
+      if (result.error === "advanced_limit") {
+        const date = new Date(result.nextEligibleAt).toLocaleDateString()
+        toast.error(`Weekly limit reached — you can join another beginner challenge on ${date}`)
+        return
+      } else if (result.error === "skill_gate") {
+        router.push(`/challenges/${challengeId}/skill-gate?tier=${result.requiredTier}&difficulty=${result.difficulty}`)
+        return
+      } else if (result.error) {
         toast.error(result.error)
       } else if (result.status === "overlap_warning") {
         // Trigger the dialog
