@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { assignEvaluator, removeEvaluator } from "@/app/admin/actions"
-import { UserCheck, Trash2, Plus, Clock, AlertCircle } from "lucide-react"
+import { assignEvaluator, removeEvaluator, setChiefEvaluator } from "@/app/admin/actions"
+import { toast } from "sonner"
+import { UserCheck, Trash2, Plus, Clock, AlertCircle, Star } from "lucide-react"
 
 interface Evaluator {
   evaluator_id: string
   review_deadline: string | null
   assigned_at: string | null
+  is_chief: boolean
   profile: {
     first_name: string | null
     last_name: string | null
@@ -41,6 +43,7 @@ export default function EvaluatorAssignmentPanel({
   const [reviewDeadline, setReviewDeadline] = useState("")
   const [isAssigning, setIsAssigning] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [settingChiefId, setSettingChiefId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const assignedIds = new Set(assignments.map(a => a.evaluator_id))
@@ -73,6 +76,7 @@ export default function EvaluatorAssignmentPanel({
           evaluator_id: ev.id,
           review_deadline: reviewDeadline || null,
           assigned_at: new Date().toISOString(),
+          is_chief: false,
           profile: { first_name: ev.first_name, last_name: ev.last_name },
         },
       ])
@@ -95,6 +99,21 @@ export default function EvaluatorAssignmentPanel({
     }
 
     setAssignments(prev => prev.filter(a => a.evaluator_id !== evaluatorId))
+  }
+
+  const handleSetChief = async (evaluatorId: string) => {
+    setSettingChiefId(evaluatorId)
+    const result = await setChiefEvaluator(challengeId, evaluatorId)
+    setSettingChiefId(null)
+
+    if (result.success) {
+      toast.success("Chief evaluator updated")
+      setAssignments(prev =>
+        prev.map(a => ({ ...a, is_chief: a.evaluator_id === evaluatorId }))
+      )
+    } else {
+      toast.error(result.error ?? "Failed to update chief evaluator")
+    }
   }
 
   const formatDeadline = (deadline: string | null) => {
@@ -137,49 +156,80 @@ export default function EvaluatorAssignmentPanel({
             No evaluators assigned yet.
           </p>
         ) : (
-          <div className="divide-y divide-border rounded-md border">
-            {assignments.map((a) => {
-              const name = a.profile
-                ? `${a.profile.first_name || ""} ${a.profile.last_name || ""}`.trim() || "Unknown"
-                : "Unknown"
-              const deadline = formatDeadline(a.review_deadline)
+          <>
+            <div className="divide-y divide-border rounded-md border">
+              {assignments.map((a) => {
+                const name = a.profile
+                  ? `${a.profile.first_name || ""} ${a.profile.last_name || ""}`.trim() || "Unknown"
+                  : "Unknown"
+                const deadline = formatDeadline(a.review_deadline)
 
-              return (
-                <div key={a.evaluator_id} className="flex items-center justify-between px-3 py-2.5 gap-3">
-                  <div className="space-y-0.5 flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{name}</p>
-                    {deadline ? (
-                      <p className={`text-xs flex items-center gap-1 ${
-                        deadline.isOverdue ? "text-destructive" :
-                        deadline.isSoon ? "text-amber-600" :
-                        "text-muted-foreground"
-                      }`}>
-                        <Clock className="h-3 w-3" />
-                        {deadline.isOverdue
-                          ? `Overdue — ${deadline.label}`
-                          : `Due ${deadline.label}`}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No deadline set</p>
-                    )}
+                return (
+                  <div key={a.evaluator_id} className="flex items-center justify-between px-3 py-2.5 gap-3">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate">{name}</p>
+                        {a.is_chief && (
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                            Chief
+                          </Badge>
+                        )}
+                      </div>
+                      {deadline ? (
+                        <p className={`text-xs flex items-center gap-1 ${
+                          deadline.isOverdue ? "text-destructive" :
+                          deadline.isSoon ? "text-amber-600" :
+                          "text-muted-foreground"
+                        }`}>
+                          <Clock className="h-3 w-3" />
+                          {deadline.isOverdue
+                            ? `Overdue — ${deadline.label}`
+                            : `Due ${deadline.label}`}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No deadline set</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className={`h-7 w-7 shrink-0 ${a.is_chief ? "text-yellow-500 hover:text-yellow-600" : "text-muted-foreground hover:text-yellow-500"}`}
+                        onClick={() => handleSetChief(a.evaluator_id)}
+                        disabled={settingChiefId === a.evaluator_id}
+                        title={a.is_chief ? "Chief evaluator — tiebreaker" : "Set as chief evaluator"}
+                      >
+                        {settingChiefId === a.evaluator_id ? (
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <Star className={`h-3.5 w-3.5 ${a.is_chief ? "fill-current" : ""}`} />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => handleRemove(a.evaluator_id)}
+                        disabled={removingId === a.evaluator_id}
+                      >
+                        {removingId === a.evaluator_id ? (
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={() => handleRemove(a.evaluator_id)}
-                    disabled={removingId === a.evaluator_id}
-                  >
-                    {removingId === a.evaluator_id ? (
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+            {assignments.length > 1 && (
+              <p className="text-xs text-muted-foreground">
+                The chief evaluator&apos;s ranking is used as a tiebreaker if scores are equal
+                after all automatic tiebreakers.
+              </p>
+            )}
+          </>
         )}
 
         {/* Assign new evaluator */}

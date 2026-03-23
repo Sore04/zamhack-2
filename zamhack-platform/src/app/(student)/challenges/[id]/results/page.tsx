@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Trophy, Medal, Award, ArrowLeft, Star } from "lucide-react"
 import Link from "next/link"
 import CertificateDropdown from "@/components/certificate/certificate-dropdown" // ← ADD
+import { ResolveTieModal } from "@/components/challenges/resolve-tie-modal"
+import { getTiedParticipantDetails } from "@/app/challenges/actions"
 
 // Define the exact shape of our joined data to satisfy TypeScript
 interface WinnerData {
@@ -14,6 +16,7 @@ interface WinnerData {
   prize: string | null
   score: number | null  // ← reads stored score directly from winners table
   profile_id: string    // needed to match with participant scores
+  is_tied: boolean | null
   profile: {
     first_name: string | null
     last_name: string | null
@@ -73,12 +76,41 @@ export default async function ChallengeResultsPage({
       prize,
       score,
       profile_id,
-      profile:profiles (first_name, last_name, avatar_url, university)
+      is_tied,
+      profile:profiles!winners_profile_id_fkey (first_name, last_name, avatar_url, university)
     `)
     .eq("challenge_id", id)
     .order("rank", { ascending: true })
 
   const winners = data as unknown as WinnerData[] | null
+
+  // Tie detection
+  const hasTies = (winners ?? []).some(w => (w as any).is_tied === true)
+  let tiedWinners: Awaited<ReturnType<typeof getTiedParticipantDetails>>["tiedWinners"] = []
+  if (hasTies) {
+    try {
+      const result = await getTiedParticipantDetails(id)
+      tiedWinners = result.tiedWinners
+    } catch (e) {
+      console.error("getTiedParticipantDetails failed:", e)
+      // Non-fatal — page still renders, tie banner just won't show
+    }
+  }
+
+  // Fetch current user's role to gate the resolve button
+  let userRole: string | null = null
+  if (user) {
+    try {
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+      userRole = userProfile?.role ?? null
+    } catch (e) {
+      console.error("userRole fetch failed:", e)
+    }
+  }
 
   // NOTE: allParticipants query removed — RLS on challenge_participants blocks
   // students from seeing other participants' rows, causing leaderboard to show
@@ -216,6 +248,36 @@ export default async function ChallengeResultsPage({
             <div className="h-px w-16 bg-border" />
           </div>
         </div>
+
+        {/* Tie Banner */}
+        {hasTies && (
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 flex items-start gap-3 mb-8">
+            <span className="text-yellow-600 text-lg mt-0.5">⚠</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-800">
+                Tie detected — results are not yet final
+              </p>
+              <p className="text-sm text-yellow-700 mt-1">
+                Some participants are tied and require manual resolution
+                before final rankings are confirmed.
+              </p>
+              {(userRole === "admin" || userRole === "company_admin" || userRole === "company_member") && (
+                <div className="mt-3">
+                  <ResolveTieModal
+                    challengeId={id}
+                    tiedWinners={tiedWinners}
+                    onResolved={() => {}}
+                    trigger={
+                      <Button size="sm" variant="outline" className="border-yellow-400 text-yellow-800 hover:bg-yellow-100">
+                        Resolve Tie
+                      </Button>
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Podium Layout: 2nd, 1st, 3rd */}
         <div className="flex flex-col md:flex-row items-end justify-center gap-4 md:gap-6 mb-16">

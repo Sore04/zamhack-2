@@ -349,6 +349,45 @@ export async function removeEvaluator(
   revalidatePath(`/evaluator/assignments`)
   return { success: true }
 }
+
+export async function setChiefEvaluator(
+  challengeId: string,
+  evaluatorId: string
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (profile?.role !== "admin") return { success: false, error: "Unauthorized" }
+
+  // Clear any existing chief for this challenge
+  const { error: clearError } = await (supabase
+    .from("challenge_evaluators")
+    .update({ is_chief: false } as any)
+    .eq("challenge_id", challengeId) as any)
+
+  if (clearError) return { success: false, error: clearError.message }
+
+  // Set the new chief
+  const { error: setError } = await (supabase
+    .from("challenge_evaluators")
+    .update({ is_chief: true } as any)
+    .eq("challenge_id", challengeId)
+    .eq("evaluator_id", evaluatorId) as any)
+
+  if (setError) return { success: false, error: setError.message }
+
+  revalidatePath(`/admin/challenges/${challengeId}`)
+  return { success: true, error: null }
+}
+
 // ==========================================
 // EVALUATOR CREATION
 // ==========================================

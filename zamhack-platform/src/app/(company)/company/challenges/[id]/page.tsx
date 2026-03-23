@@ -8,9 +8,10 @@ import { Database } from "@/types/supabase"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Lock } from "lucide-react"
-import { submitChallengeForApproval } from "@/app/challenges/actions"
+import { submitChallengeForApproval, getTiedParticipantDetails } from "@/app/challenges/actions"
 import { CloseChallengeButton } from "@/components/challenges/close-challenge-button"
 import { RecalculateWinnersButton } from "@/components/challenges/recalculate-winners-button"
+import { ResolveTieModal } from "@/components/challenges/resolve-tie-modal"
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
 type Participant = Database["public"]["Tables"]["challenge_participants"]["Row"]
 type Profile = Database["public"]["Tables"]["profiles"]["Row"]
@@ -288,6 +289,12 @@ export default async function ChallengeManagementPage({
   const isDraft = challenge.status === "draft"
   const isClosed = challenge.status === "closed" || challenge.status === "completed"
 
+  // Fetch tied winner details for the banner (only relevant when closed)
+  const { tiedWinners } = isClosed
+    ? await getTiedParticipantDetails(id)
+    : { tiedWinners: [] }
+  const hasTies = tiedWinners.length > 0
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -332,6 +339,34 @@ export default async function ChallengeManagementPage({
           )}
         </div>
       </div>
+
+      {/* Tie Banner */}
+      {hasTies && (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 flex items-start gap-3">
+          <span className="text-yellow-600 text-lg mt-0.5">⚠</span>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-yellow-800">
+              Tie detected — results are not yet final
+            </p>
+            <p className="text-sm text-yellow-700 mt-1">
+              Some participants are tied and require manual resolution
+              before final rankings are confirmed.
+            </p>
+            <div className="mt-3">
+              <ResolveTieModal
+                challengeId={id}
+                tiedWinners={tiedWinners}
+                onResolved={() => {}}
+                trigger={
+                  <Button size="sm" variant="outline" className="border-yellow-400 text-yellow-800 hover:bg-yellow-100">
+                    Resolve Tie
+                  </Button>
+                }
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">

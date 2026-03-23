@@ -36,7 +36,7 @@ export default async function AdminChallengeDetailsPage({
   // Fetch current evaluator assignments for this challenge
   const { data: evaluatorAssignments } = await supabase
     .from("challenge_evaluators")
-    .select("evaluator_id, review_deadline, assigned_at, profiles(first_name, last_name)")
+    .select("evaluator_id, review_deadline, assigned_at, is_chief, profiles(first_name, last_name)")
     .eq("challenge_id", id)
 
   // Fetch all available evaluator accounts
@@ -50,6 +50,7 @@ export default async function AdminChallengeDetailsPage({
     evaluator_id: a.evaluator_id,
     review_deadline: a.review_deadline,
     assigned_at: a.assigned_at,
+    is_chief: a.is_chief ?? false,
     profile: a.profiles ?? null,
   }))
 

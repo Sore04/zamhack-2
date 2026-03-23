@@ -19,18 +19,21 @@ export type Database = {
           assigned_at: string | null
           challenge_id: string
           evaluator_id: string
+          is_chief: boolean
           review_deadline: string | null
         }
         Insert: {
           assigned_at?: string | null
           challenge_id: string
           evaluator_id: string
+          is_chief?: boolean
           review_deadline?: string | null
         }
         Update: {
           assigned_at?: string | null
           challenge_id?: string
           evaluator_id?: string
+          is_chief?: boolean
           review_deadline?: string | null
         }
         Relationships: [
@@ -1032,28 +1035,34 @@ export type Database = {
           announced_at: string | null
           challenge_id: string
           id: string
+          is_tied: boolean
           prize: string | null
           profile_id: string
           rank: number
           score: number | null
+          tie_resolved_by: string | null
         }
         Insert: {
           announced_at?: string | null
           challenge_id: string
           id?: string
+          is_tied?: boolean
           prize?: string | null
           profile_id: string
           rank: number
           score?: number | null
+          tie_resolved_by?: string | null
         }
         Update: {
           announced_at?: string | null
           challenge_id?: string
           id?: string
+          is_tied?: boolean
           prize?: string | null
           profile_id?: string
           rank?: number
           score?: number | null
+          tie_resolved_by?: string | null
         }
         Relationships: [
           {

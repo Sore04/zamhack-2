@@ -194,9 +194,19 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
   const handleNext = async (e: React.MouseEvent) => {
     e.preventDefault()
     const isValid = await validateStep(currentStep)
-    if (isValid) {
-      setCurrentStep((prev) => Math.min(prev + 1, STEPS.length))
+    if (!isValid) return
+
+    // Step 2 extra guard: end date required if not perpetual
+    // (superRefine only runs on full submit, not per-field trigger)
+    if (currentStep === 2 && !watchedValues.isPerpetual && !watchedValues.endDate) {
+      form.setError("endDate", {
+        type: "manual",
+        message: "End date is required for non-perpetual challenges",
+      })
+      return
     }
+
+    setCurrentStep((prev) => Math.min(prev + 1, STEPS.length))
   }
 
   const handlePrevious = (e: React.MouseEvent) => {
