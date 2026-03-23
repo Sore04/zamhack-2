@@ -119,7 +119,9 @@ export async function submitMilestone(formData: FormData) {
     !milestone?.requires_github &&
     !milestone?.requires_url
 
-  if (submissionId && milestone?.challenge_id && isTextOnly) {
+  const shouldAutoEval = isTextOnly && (milestone?.challenges as any)?.scoring_mode !== 'evaluator_only'
+
+  if (submissionId && milestone?.challenge_id && shouldAutoEval) {
     after(() =>
       autoEvaluateSubmission(submissionId!, milestone.challenge_id!, milestoneId).catch((err) =>
         console.error("[auto-eval] failed:", err?.message ?? err)

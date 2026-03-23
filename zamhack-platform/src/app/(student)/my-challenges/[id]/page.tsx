@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { SubmissionForm } from "@/components/submission-form"
 import { RubricCriteriaCard } from "@/components/rubric-criteria-card"
-import { AlertCircle, CheckCircle2, Lock, MessageSquare, Bot } from "lucide-react"
+import { AlertCircle, CheckCircle2, Lock, MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { computeFinalScore, splitEvaluationsByRole, type ScoringMode } from "@/lib/scoring-utils"
 
@@ -29,7 +29,6 @@ interface ChallengeProgressData {
   participant: ChallengeParticipant
   submissions: Submission[]
   evaluations: EvaluationWithRole[]
-  aiEvaluations: Evaluation[]
   rubrics: Rubric[]
 }
 
@@ -44,7 +43,6 @@ interface MilestoneWithStatus extends Milestone {
   submission: Submission | null
   companyEval: EvaluationWithRole | null
   evaluatorEval: EvaluationWithRole | null
-  aiEval: Evaluation | null
   finalScore: number | null
   finalScoreLabel: string
   isFallback: boolean
@@ -134,17 +132,6 @@ async function getChallengeProgress(
     }
   }
 
-  // Fetch AI auto-evaluations (reviewer_id IS NULL, is_draft = true)
-  let aiEvaluations: Evaluation[] = []
-  if (submissionIds.length > 0) {
-    const { data: aiEvals } = await supabase
-      .from("evaluations")
-      .select("*")
-      .in("submission_id", submissionIds)
-      .is("reviewer_id", null)
-    aiEvaluations = aiEvals || []
-  }
-
   // Fetch rubrics for the challenge
   const { data: rubrics, error: rubricsError } = await supabase
     .from("rubrics")
@@ -162,7 +149,6 @@ async function getChallengeProgress(
     participant: participant as ChallengeParticipant,
     submissions: submissions || [],
     evaluations: evaluations || [],
-    aiEvaluations: aiEvaluations || [],
     rubrics: rubrics || [],
   }
 }
@@ -205,7 +191,7 @@ export default async function ChallengeProgressPage({
     )
   }
 
-  const { challenge, milestones, participant, submissions, evaluations, aiEvaluations, rubrics } = data
+  const { challenge, milestones, participant, submissions, evaluations, rubrics } = data
 
   // Create a map of milestone_id -> submission
   const submissionMap = new Map<string, Submission>()
@@ -222,12 +208,6 @@ export default async function ChallengeProgressPage({
       const existing = evaluationsBySubmission.get(e.submission_id) || []
       evaluationsBySubmission.set(e.submission_id, [...existing, e])
     }
-  })
-
-  // Map AI evaluations by submission_id
-  const aiEvalBySubmission = new Map<string, Evaluation>()
-  aiEvaluations.forEach((e) => {
-    if (e.submission_id) aiEvalBySubmission.set(e.submission_id, e)
   })
 
   // Group rubrics by milestone_id; null key = challenge-level fallback
@@ -249,7 +229,6 @@ export default async function ChallengeProgressPage({
     const submission = submissionMap.get(milestone.id) || null
     const subEvals = submission ? (evaluationsBySubmission.get(submission.id) || []) : []
     const { companyEval, evaluatorEval } = splitEvaluationsByRole(subEvals)
-    const aiEval = submission ? (aiEvalBySubmission.get(submission.id) || null) : null
     const { finalScore, label, isFallback } = computeFinalScore({
       companyScore: companyEval?.score ?? null,
       evaluatorScore: evaluatorEval?.score ?? null,
@@ -270,7 +249,6 @@ export default async function ChallengeProgressPage({
       submission,
       companyEval,
       evaluatorEval,
-      aiEval,
       finalScore,
       finalScoreLabel: label,
       isFallback,
@@ -515,34 +493,6 @@ export default async function ChallengeProgressPage({
                         </Card>
                       )}
 
-                      {/* AI auto-evaluation — always advisory, shown separately */}
-                      {milestone.aiEval && (
-                        <Card className="border-dashed border-slate-300 bg-slate-50/50">
-                          <CardHeader className="pb-2">
-                            <div className="flex items-center gap-2">
-                              <Bot className="h-4 w-4 text-slate-400" />
-                              <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                                AI Evaluation (advisory only)
-                              </CardTitle>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-2">
-                            {milestone.aiEval.score !== null && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Score:</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {milestone.aiEval.score}/100
-                                </Badge>
-                              </div>
-                            )}
-                            {milestone.aiEval.feedback && (
-                              <p className="text-sm text-slate-500 whitespace-pre-wrap leading-relaxed">
-                                {milestone.aiEval.feedback}
-                              </p>
-                            )}
-                          </CardContent>
-                        </Card>
-                      )}
                     </>
                   )}
                 </CardContent>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { GradingForm } from "@/components/challenges/grading-form"
 import { Database } from "@/types/supabase"
 import Link from "next/link"
-import { ExternalLink, Github, Globe } from "lucide-react"
+import { ExternalLink, Github, Globe, Bot } from "lucide-react"
 
 type Submission = Database["public"]["Tables"]["submissions"]["Row"]
 type Milestone = Database["public"]["Tables"]["milestones"]["Row"]
@@ -26,6 +26,7 @@ interface SubmissionReviewData {
   evaluation: Evaluation | null
   rubrics: Rubric[]
   scores: Score[]
+  aiEvaluation: Evaluation | null
 }
 
 async function getSubmissionReviewData(
@@ -160,6 +161,14 @@ async function getSubmissionReviewData(
     .eq("reviewer_id", user.id)
     .maybeSingle()
 
+  // Fetch AI auto-evaluation (reviewer_id IS NULL)
+  const { data: aiEvaluation } = await supabase
+    .from("evaluations")
+    .select("*")
+    .eq("submission_id", submissionId)
+    .is("reviewer_id", null)
+    .maybeSingle()
+
   // Only fetch scores if the company reviewer has their own evaluation already.
   // Auto-eval writes scores too, but we don't want those pre-filling the company form.
   let scores: any[] = []
@@ -180,6 +189,7 @@ async function getSubmissionReviewData(
     evaluation: evaluation || null,
     rubrics: rubrics || [],
     scores,
+    aiEvaluation: aiEvaluation || null,
   }
 }
 
@@ -214,7 +224,10 @@ export default async function SubmissionReviewPage({
     )
   }
 
-  const { submission, milestone, profile, evaluation, rubrics, scores } = data
+  const { submission, milestone, challenge, profile, evaluation, rubrics, scores, aiEvaluation } = data
+
+  const scoringMode = (challenge as any)?.scoring_mode ?? 'company_only'
+  const showAiFeedback = (scoringMode === 'company_only' || scoringMode === 'average') && aiEvaluation !== null
 
   const fullName = profile
     ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown Student"
@@ -352,6 +365,41 @@ export default async function SubmissionReviewPage({
 
         {/* Right Column: The Grade */}
         <div>
+          {showAiFeedback && (
+            <Card className="border-dashed border-amber-200 bg-amber-50/50">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-amber-500" />
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-amber-800">
+                      AI Suggested Feedback
+                    </CardTitle>
+                    <p className="text-xs text-amber-600 mt-0.5">
+                      Private — visible to you only
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {aiEvaluation.score !== null && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-medium">AI Score:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {aiEvaluation.score}/100
+                    </Badge>
+                  </div>
+                )}
+                {aiEvaluation.feedback && (
+                  <p className="text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">
+                    {aiEvaluation.feedback}
+                  </p>
+                )}
+                <p className="text-xs text-amber-600 border-t border-amber-200 pt-2 mt-1">
+                  Use this as a guide. Your evaluation is what counts.
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <GradingForm
             submissionId={submissionId}
             initialEvaluation={evaluation}
