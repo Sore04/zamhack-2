@@ -12,8 +12,10 @@ import {
   FileText,
   Layers,
   Ban,
+  ShieldCheck,
 } from "lucide-react"
 import "@/app/(admin)/admin.css"
+import { GuardrailsForm } from "./guardrails-form"
 
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"] & {
   organization?: { name: string | null } | null
@@ -63,6 +65,13 @@ export default async function AdminChallengesPage({
     .order("created_at", { ascending: false })
 
   if (error) console.error(error)
+
+  // Fetch platform settings for guardrails
+  const { data: platformSettings } = await supabase
+    .from("platform_settings")
+    .select("advanced_beginner_weekly_limit")
+    .eq("id", true)
+    .single()
 
   const allChallenges = (challenges || []) as Challenge[]
 
@@ -127,6 +136,7 @@ export default async function AdminChallengesPage({
     { key: "draft",           label: "Draft",           icon: FileText,     count: counts.draft },
     { key: "rejected",        label: "Rejected",        icon: XCircle,      count: counts.rejected },
     { key: "cancelled",       label: "Cancelled",       icon: Ban,          count: counts.cancelled },
+    { key: "guardrails",      label: "Guardrails",      icon: ShieldCheck,  count: 0 },
   ]
 
   // --- Badge helpers ---
@@ -211,8 +221,8 @@ export default async function AdminChallengesPage({
           <div className="admin-tabs" style={{ marginBottom: 0, minWidth: "max-content" }}>
             {tabs.map((tab) => {
               const Icon = tab.icon
-              // Only show tab if it has items, or it's "all", or currently active
-              if (tab.key !== "all" && tab.count === 0 && activeTab !== tab.key) return null
+              // Always show "all" and "guardrails" tabs; others only if they have items or are active
+              if (tab.key !== "all" && tab.key !== "guardrails" && tab.count === 0 && activeTab !== tab.key) return null
               return (
                 <a
                   key={tab.key}
@@ -231,6 +241,18 @@ export default async function AdminChallengesPage({
             })}
           </div>
         </div>
+
+        {/* Guardrails tab content */}
+        {activeTab === "guardrails" && (
+          <div style={{ padding: "1.5rem" }}>
+            <GuardrailsForm
+              currentLimit={(platformSettings as any)?.advanced_beginner_weekly_limit ?? 1}
+            />
+          </div>
+        )}
+
+        {/* Challenge list (hidden when Guardrails tab is active) */}
+        {activeTab !== "guardrails" && <>
 
         {/* Search row */}
         <div style={{
@@ -458,6 +480,9 @@ export default async function AdminChallengesPage({
             )}
           </>
         )}
+
+        {/* End challenge list */}
+        </>}
       </div>
     </div>
   )

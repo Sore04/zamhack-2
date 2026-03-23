@@ -5,6 +5,8 @@ import { after } from "next/server"
 import { createClient } from "@/utils/supabase/server"
 import { Database } from "@/types/supabase"
 import { autoEvaluateSubmission } from "@/lib/auto-evaluate"
+import { awardChallengeSkills } from "@/lib/award-skills"
+import { type ScoringMode } from "@/lib/scoring-utils"
 
 type SubmissionInsert = Database["public"]["Tables"]["submissions"]["Insert"]
 
@@ -99,11 +101,11 @@ export async function submitMilestone(formData: FormData) {
 
   // Revalidate the challenge page to update UI immediately
   // We need to get the challenge_id from the milestone to revalidate the correct path
-  const { data: milestone } = await supabase
+  const { data: milestone } = await (supabase
     .from("milestones")
-    .select("challenge_id, requires_text, requires_github, requires_url")
+    .select("challenge_id, requires_text, requires_github, requires_url, challenges(is_perpetual, scoring_mode)")
     .eq("id", milestoneId)
-    .single()
+    .single() as any)
 
   if (milestone?.challenge_id) {
     revalidatePath(`/my-challenges/${milestone.challenge_id}`)
@@ -123,6 +125,31 @@ export async function submitMilestone(formData: FormData) {
         console.error("[auto-eval] failed:", err?.message ?? err)
       )
     )
+  }
+
+  // For perpetual challenges: award skills when all milestones are submitted
+  const isPerpetual = (milestone?.challenges as any)?.is_perpetual === true
+  if (isPerpetual && milestone?.challenge_id) {
+    const { count: totalMilestones } = await supabase
+      .from("milestones")
+      .select("id", { count: "exact" })
+      .eq("challenge_id", milestone.challenge_id)
+
+    const { data: milestoneIds } = await supabase
+      .from("milestones")
+      .select("id")
+      .eq("challenge_id", milestone.challenge_id)
+
+    const { count: submittedCount } = await supabase
+      .from("submissions")
+      .select("id", { count: "exact" })
+      .eq("participant_id", participantId)
+      .in("milestone_id", milestoneIds?.map((m) => m.id) ?? [])
+
+    if (submittedCount === totalMilestones && totalMilestones !== null && totalMilestones > 0) {
+      const challengeScoringMode = ((milestone?.challenges as any)?.scoring_mode ?? "company_only") as ScoringMode
+      await awardChallengeSkills(supabase, milestone.challenge_id, user.id, challengeScoringMode)
+    }
   }
 
   return { success: true }
