@@ -96,8 +96,9 @@ export default async function MyChallengesPage() {
     const isPerpetual = isPerpetualChallenge(challenge)
     const isCompleted = completionMap.get(challenge.id) ?? false
     const isStatusPast = PAST_CHALLENGE_STATUSES.includes(challenge.status as string)
+    const isEnded = challenge.end_date ? new Date(challenge.end_date) < new Date() : false
 
-    if (isStatusPast || (isPerpetual && isCompleted)) {
+    if (isStatusPast || (isPerpetual && isCompleted) || isEnded ) {
       pastChallenges.push(challenge)
     } else {
       activeChallenges.push(challenge)

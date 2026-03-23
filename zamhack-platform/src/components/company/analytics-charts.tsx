@@ -6,6 +6,7 @@ import {
   LineChart, Line,
 } from "recharts"
 
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface TopSchool       { university: string; count: number }

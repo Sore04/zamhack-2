@@ -7,6 +7,7 @@ import { MessageSquare, Loader2 } from "lucide-react"
 import { getOrCreateCompanyConversation } from "@/app/(student)/my-challenges/message-company-action"
 import { toast } from "sonner"
 
+
 interface MessageCompanyButtonProps {
   challengeId: string
 }

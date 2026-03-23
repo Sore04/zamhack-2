@@ -12,7 +12,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} 
+from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { withdrawFromChallenge } from "@/app/(student)/my-challenges/actions"
 import { LogOut, Loader2 } from "lucide-react"

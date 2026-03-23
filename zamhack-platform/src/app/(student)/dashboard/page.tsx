@@ -84,9 +84,15 @@ async function getDashboardData(): Promise<DashboardData> {
   const allParticipations = participations || []
   const activeStatuses = ["approved", "in_progress", "under_review"]
 
-  const activeParts = allParticipations.filter((p) =>
-    activeStatuses.includes((p.challenges as any)?.status || "")
-  )
+  const now = new Date()
+const activeParts = allParticipations.filter((p) => {
+  const challenge = p.challenges as any
+  if (!activeStatuses.includes(challenge?.status || "")) return false
+  // If end_date exists and has passed, treat as no longer active
+  if (challenge?.end_date && new Date(challenge.end_date) < now) return false
+  return true
+})
+
   const completedParts = allParticipations.filter((p) =>
     ["completed", "closed"].includes((p.challenges as any)?.status || "")
   )

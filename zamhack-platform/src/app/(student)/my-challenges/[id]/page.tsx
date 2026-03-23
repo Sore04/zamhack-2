@@ -12,6 +12,7 @@ import { AlertCircle, CheckCircle2, Lock, MessageSquare, Bot } from "lucide-reac
 import Link from "next/link"
 import { computeFinalScore, splitEvaluationsByRole, type ScoringMode } from "@/lib/scoring-utils"
 
+
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
 type Organization = Database["public"]["Tables"]["organizations"]["Row"]
 type Milestone = Database["public"]["Tables"]["milestones"]["Row"]
