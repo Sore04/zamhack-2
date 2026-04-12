@@ -15,6 +15,9 @@ interface Props {
   isTop3: boolean
   rank?: 1 | 2 | 3
   awardDate: string
+  representativeName?: string | null
+  signatureUrl?: string | null
+  verifyUrl?: string | null
 }
 
 type CertType = "completion" | "winner"
@@ -26,11 +29,54 @@ const RANK_LABEL: Record<number, string> = {
 }
 
 /**
+ * Fetches a cross-origin image and converts it to a base64 data URL so it can
+ * be embedded inside the sandboxed about:blank iframe without CORS errors.
+ */
+async function toDataUrl(src: string): Promise<string> {
+  const res = await fetch(src, { mode: "cors" })
+  const blob = await res.blob()
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+/**
+ * Clones a node and replaces every <img src="…"> with a base64 data URL so
+ * that images load correctly inside the sandboxed iframe regardless of CORS.
+ */
+async function cloneWithInlinedImages(node: HTMLElement): Promise<HTMLElement> {
+  const cloned = node.cloneNode(true) as HTMLElement
+  const imgs = Array.from(cloned.querySelectorAll("img[src]")) as HTMLImageElement[]
+  await Promise.all(
+    imgs.map(async (img) => {
+      const src = img.getAttribute("src")
+      if (src && !src.startsWith("data:")) {
+        try {
+          img.src = await toDataUrl(src)
+        } catch {
+          // If preload fails leave the src as-is; html2canvas will try useCORS
+        }
+      }
+    })
+  )
+  return cloned
+}
+
+/**
  * Renders the certificate node inside a sandboxed iframe to fully isolate it
  * from the page's shadcn CSS variables (which use oklch/lab colors that
  * html2canvas cannot parse). Returns a canvas of the rendered certificate.
  */
 async function captureInIframe(node: HTMLElement): Promise<HTMLCanvasElement> {
+  // Pre-convert cross-origin images (e.g. Supabase signed signature URL) to
+  // data URLs on the main page where CORS is permitted. The about:blank iframe
+  // has a null origin so it cannot load those URLs itself, causing html2canvas
+  // to render a broken-image placeholder (the "swash" artefact).
+  const cloned = await cloneWithInlinedImages(node)
+
   return new Promise((resolve, reject) => {
     const iframe = document.createElement("iframe")
     iframe.style.cssText =
@@ -46,7 +92,7 @@ async function captureInIframe(node: HTMLElement): Promise<HTMLCanvasElement> {
           body { background: #ffffff; font-family: Georgia, serif; }
         </style>`
         doc.body.style.cssText = "background:#fff;margin:0;padding:0;"
-        doc.body.appendChild(node.cloneNode(true))
+        doc.body.appendChild(cloned)
 
         // Give the iframe a moment to paint
         await new Promise((r) => setTimeout(r, 150))
@@ -57,8 +103,6 @@ async function captureInIframe(node: HTMLElement): Promise<HTMLCanvasElement> {
           useCORS: true,
           backgroundColor: "#ffffff",
           logging: false,
-          // Use the iframe's window so html2canvas reads styles from there,
-          // not from the main page where lab() variables are defined
           windowWidth: 1056,
           windowHeight: 748,
         })
@@ -82,6 +126,9 @@ export default function CertificateDropdown({
   isTop3,
   rank,
   awardDate,
+  representativeName,
+  signatureUrl,
+  verifyUrl,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState<CertType | null>(null)
@@ -107,6 +154,20 @@ export default function CertificateDropdown({
       const imgData = canvas.toDataURL("image/png")
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" })
       pdf.addImage(imgData, "PNG", 0, 0, 297, 210)
+
+      // Add a clickable + selectable link annotation over the verify URL area in the footer.
+      // The certificate is 1056×748px mapped to 297×210mm (A4 landscape).
+      // Scale: 297/1056 ≈ 0.281 mm/px.
+      // The verify URL sits in the bottom-right column, approximately:
+      //   x: 828–1008px → 233–283mm  |  y: 718–736px → 202–207mm
+      if (verifyUrl) {
+        const taggedUrl = `${verifyUrl}?type=${type}`
+        const fullUrl = taggedUrl.startsWith("http") ? taggedUrl : `https://${taggedUrl}`
+        // Invisible clickable rectangle over the verify URL text already rendered in the canvas.
+        // Do NOT add a pdf.text() overlay — the URL is already in the HTML-captured image and
+        // a second text layer would misalign / blur the text.
+        pdf.link(233, 200, 50, 8, { url: fullUrl })
+      }
 
       const safeName = studentName.replace(/\s+/g, "_")
       const safeChallenge = challengeTitle.replace(/\s+/g, "_").slice(0, 30)
@@ -144,6 +205,9 @@ export default function CertificateDropdown({
               challengeTitle={challengeTitle}
               organizationName={organizationName}
               completionDate={completionDate}
+              representativeName={representativeName}
+              signatureUrl={signatureUrl}
+              verifyUrl={verifyUrl ? `${verifyUrl}?type=completion` : null}
             />
           </div>
 
@@ -155,6 +219,9 @@ export default function CertificateDropdown({
                 organizationName={organizationName}
                 rank={rank}
                 awardDate={awardDate}
+                representativeName={representativeName}
+                signatureUrl={signatureUrl}
+                verifyUrl={verifyUrl ? `${verifyUrl}?type=winner` : null}
               />
             </div>
           )}

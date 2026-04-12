@@ -124,15 +124,26 @@ export function ChallengeCard({ challenge, perpetualResultsHref, isParticipant, 
   const deadline    = formatDeadline(challenge.end_date)
   const accentClass = orgAccentClass(challenge.organization?.name)
 
+  // For closed non-perpetual challenges, link directly to the official results/leaderboard
+  const resultsHref = isClosed && !isPerpetual
+    ? `/challenges/${challenge.id}/results`
+    : undefined
+
   // Decide where the CTA links and what it says
   const ctaHref = perpetualResultsHref
+    ?? resultsHref
     ?? (isParticipant ? `/my-challenges/${challenge.id}` : `/challenges/${challenge.id}`)
 
   const ctaContent = (() => {
     if (isPerpetualCompleted) {
-      // Completed perpetual → looks identical to a normal closed challenge CTA
       return {
         label: <><CheckCircle2 size={14} /> View Results</>,
+        className: "cc-cta cc-cta-muted",
+      }
+    }
+    if (isClosed && !isPerpetual) {
+      return {
+        label: <><Trophy size={14} /> View Official Results</>,
         className: "cc-cta cc-cta-muted",
       }
     }

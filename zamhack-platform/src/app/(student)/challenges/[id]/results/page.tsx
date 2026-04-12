@@ -1,4 +1,6 @@
 import { createClient } from "@/utils/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { Database } from "@/types/supabase"
 import { redirect } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -42,7 +44,7 @@ export default async function ChallengeResultsPage({
   // 1. Fetch Challenge Status
   const { data: challenge } = await supabase
     .from("challenges")
-    .select("title, status, organization:organizations(name)")
+    .select("title, status, organization:organizations(name, representative_name, signature_url)")
     .eq("id", id)
     .single()
 
@@ -124,7 +126,27 @@ export default async function ChallengeResultsPage({
   }))
 
   // ← ADD: derive current user's certificate eligibility from winners table
-  const orgName = (challenge.organization as { name: string } | null)?.name ?? "ZamHack"
+  const orgData = challenge.organization as {
+    name: string
+    representative_name?: string | null
+    signature_url?: string | null
+  } | null
+  const orgName = orgData?.name ?? "ZamHack"
+  const representativeName = orgData?.representative_name ?? null
+  const rawSignaturePath = orgData?.signature_url ?? null
+
+  // Generate a short-lived signed URL for the signature image (service-role bypasses storage RLS)
+  let signatureUrl: string | null = null
+  if (rawSignaturePath) {
+    const admin = createAdminClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { data: signedData } = await admin.storage
+      .from("signatures")
+      .createSignedUrl(rawSignaturePath, 300)
+    signatureUrl = signedData?.signedUrl ?? null
+  }
   const awardDate = new Date().toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric",
   })
@@ -137,6 +159,9 @@ export default async function ChallengeResultsPage({
   const currentUserName = currentUserWinner
     ? `${currentUserWinner.profile?.first_name ?? ""} ${currentUserWinner.profile?.last_name ?? ""}`.trim()
     : ""
+  const verifyUrl = currentUserWinner
+    ? `zamhack.vercel.app/participants/${currentUserWinner.profile_id}/achievement/${id}`
+    : null
 
   const getRankConfig = (rank: number) => {
     switch (rank) {
@@ -209,6 +234,9 @@ export default async function ChallengeResultsPage({
               isTop3={isTop3}
               rank={isTop3 ? (currentUserWinner!.rank as 1 | 2 | 3) : undefined}
               awardDate={awardDate}
+              representativeName={representativeName}
+              signatureUrl={signatureUrl}
+              verifyUrl={verifyUrl}
             />
           )}
         </div>

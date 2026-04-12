@@ -12,6 +12,8 @@ import {
   Save,
   CheckCircle2,
   Image as ImageIcon,
+  PenLine,
+  Upload,
 } from "lucide-react"
 
 type Organization = Database["public"]["Tables"]["organizations"]["Row"]
@@ -29,6 +31,7 @@ const INDUSTRIES = [
 export function OrgForm({ organization }: OrgFormProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [sigPreview, setSigPreview] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -36,17 +39,20 @@ export function OrgForm({ organization }: OrgFormProps) {
     setSaved(false)
 
     const formData = new FormData(e.currentTarget)
-    const result = await updateOrganization(organization.id, formData)
-
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success(result.success)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
+    try {
+      const result = await updateOrganization(organization.id, formData)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success(result.success)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+      }
+    } catch {
+      toast.error("Something went wrong. Please try again.")
+    } finally {
+      setIsSaving(false)
     }
-
-    setIsSaving(false)
   }
 
   return (
@@ -137,7 +143,7 @@ export function OrgForm({ organization }: OrgFormProps) {
                 <input
                   id="website"
                   name="website"
-                  type="url"
+                  type="text"
                   className="cp-input"
                   defaultValue={organization.website || ""}
                   placeholder="yourcompany.com"
@@ -157,7 +163,7 @@ export function OrgForm({ organization }: OrgFormProps) {
               <input
                 id="logo_url"
                 name="logo_url"
-                type="url"
+                type="text"
                 className="cp-input"
                 defaultValue={(organization as any).logo_url || ""}
                 placeholder="https://yourcompany.com/logo.png"
@@ -211,6 +217,95 @@ export function OrgForm({ organization }: OrgFormProps) {
             <p style={{ fontSize: "0.75rem", color: "var(--cp-text-muted)", marginTop: "0.375rem" }}>
               Shown on your challenge pages. A compelling description attracts better talent.
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section: Certificate Representative ── */}
+      <div className="cp-card">
+        <div className="cp-card-header">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+            <div style={{
+              width: "2rem", height: "2rem", borderRadius: "var(--cp-radius-md, 12px)",
+              background: "var(--cp-navy-muted)", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <PenLine style={{ width: "1rem", height: "1rem", color: "var(--cp-navy)" }} />
+            </div>
+            <p className="cp-card-title">Certificate Representative</p>
+          </div>
+        </div>
+        <div className="cp-card-body">
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.125rem" }}>
+
+            {/* Representative Name */}
+            <div className="cp-form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="representative_name" className="cp-label">
+                Representative Name
+              </label>
+              <input
+                id="representative_name"
+                name="representative_name"
+                className="cp-input"
+                defaultValue={(organization as any).representative_name || ""}
+                placeholder="e.g. Jane Smith"
+              />
+              <p style={{ fontSize: "0.75rem", color: "var(--cp-text-muted)", marginTop: "0.375rem" }}>
+                The name printed on certificates issued for your challenges.
+              </p>
+            </div>
+
+            {/* Signature Upload */}
+            <div className="cp-form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="signature_file" className="cp-label">
+                <span style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+                  <Upload style={{ width: "0.875rem", height: "0.875rem" }} />
+                  Signature Image
+                </span>
+              </label>
+              <input
+                id="signature_file"
+                name="signature_file"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="cp-input"
+                style={{ paddingTop: "0.4rem" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null
+                  if (file) {
+                    const reader = new FileReader()
+                    reader.onload = (ev) => setSigPreview(ev.target?.result as string)
+                    reader.readAsDataURL(file)
+                  } else {
+                    setSigPreview(null)
+                  }
+                }}
+              />
+              {sigPreview ? (
+                <div style={{ marginTop: "0.625rem", display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                  <img
+                    src={sigPreview}
+                    alt="Signature preview"
+                    style={{
+                      height: "2.5rem", maxWidth: "10rem",
+                      objectFit: "contain",
+                      border: "1px solid var(--cp-border)",
+                      borderRadius: "var(--cp-radius-sm, 6px)",
+                      background: "white",
+                      padding: "0.25rem",
+                    }}
+                  />
+                  <span style={{ fontSize: "0.75rem", color: "var(--cp-text-muted)" }}>New signature preview</span>
+                </div>
+              ) : (organization as any).signature_url ? (
+                <p style={{ fontSize: "0.75rem", color: "var(--cp-text-muted)", marginTop: "0.375rem" }}>
+                  A signature is already on file. Upload a new image to replace it.
+                </p>
+              ) : null}
+              <p style={{ fontSize: "0.75rem", color: "var(--cp-text-muted)", marginTop: "0.375rem" }}>
+                PNG or JPEG with transparent or white background. Appears on all certificates from your organization.
+              </p>
+            </div>
+
           </div>
         </div>
       </div>

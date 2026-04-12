@@ -504,6 +504,8 @@ export type Database = {
           logo_url: string | null
           max_seats: number | null
           name: string
+          representative_name: string | null
+          signature_url: string | null
           status: string | null
           updated_at: string | null
           verification_status: string | null
@@ -518,6 +520,8 @@ export type Database = {
           logo_url?: string | null
           max_seats?: number | null
           name: string
+          representative_name?: string | null
+          signature_url?: string | null
           status?: string | null
           updated_at?: string | null
           verification_status?: string | null
@@ -532,6 +536,8 @@ export type Database = {
           logo_url?: string | null
           max_seats?: number | null
           name?: string
+          representative_name?: string | null
+          signature_url?: string | null
           status?: string | null
           updated_at?: string | null
           verification_status?: string | null

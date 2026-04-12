@@ -2,6 +2,15 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/utils/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
+import { Database } from "@/types/supabase"
+
+function getAdminSupabase() {
+  return createAdminClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function updateOrganization(orgId: string, formData: FormData) {
   const supabase = await createClient()
@@ -31,19 +40,56 @@ export async function updateOrganization(orgId: string, formData: FormData) {
   const description = formData.get("description") as string
   const website = formData.get("website") as string
   const logo_url = formData.get("logo_url") as string
+  const representative_name = formData.get("representative_name") as string
+  const signatureFile = formData.get("signature_file")
 
   if (!name) return { error: "Company name is required" }
 
-  const { error } = await supabase
+  // Handle signature image upload to Supabase Storage
+  let newSignaturePath: string | undefined = undefined // undefined = don't touch existing
+
+  if (signatureFile instanceof File && signatureFile.size > 0) {
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp"]
+    if (!allowedTypes.includes(signatureFile.type)) {
+      return { error: "Signature must be a PNG, JPEG, or WebP image" }
+    }
+    if (signatureFile.size > 2 * 1024 * 1024) {
+      return { error: "Signature image must be under 2 MB" }
+    }
+
+    const adminSupabase = getAdminSupabase()
+    const storagePath = `org-${orgId}/signature`
+    const bytes = await signatureFile.arrayBuffer()
+
+    const { error: uploadError } = await adminSupabase.storage
+      .from("signatures")
+      .upload(storagePath, bytes, {
+        contentType: signatureFile.type,
+        upsert: true,
+      })
+
+    if (uploadError) return { error: `Signature upload failed: ${uploadError.message}` }
+    newSignaturePath = storagePath
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    name,
+    industry: industry || null,
+    description: description || null,
+    website: website || null,
+    logo_url: logo_url || null,
+    representative_name: representative_name || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (newSignaturePath !== undefined) {
+    updatePayload.signature_url = newSignaturePath
+  }
+
+  const adminSupabase = getAdminSupabase()
+  const { error } = await adminSupabase
     .from("organizations")
-    .update({
-      name,
-      industry: industry || null,
-      description: description || null,
-      website: website || null,
-      logo_url: logo_url || null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", orgId)
 
   if (error) return { error: error.message }

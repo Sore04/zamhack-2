@@ -9,6 +9,9 @@ interface WinnerCertificateProps {
   rank: 1 | 2 | 3
   score?: number | null
   awardDate: string
+  representativeName?: string | null
+  signatureUrl?: string | null
+  verifyUrl?: string | null
 }
 
 const RANK_CONFIG = {
@@ -39,7 +42,7 @@ const RANK_CONFIG = {
 }
 
 const WinnerCertificate = forwardRef<HTMLDivElement, WinnerCertificateProps>(
-  ({ studentName, challengeTitle, organizationName, rank, score, awardDate }, ref) => {
+  ({ studentName, challengeTitle, organizationName, rank, score, awardDate, representativeName, signatureUrl, verifyUrl }, ref) => {
     const cfg = RANK_CONFIG[rank]
 
     return (
@@ -204,35 +207,56 @@ const WinnerCertificate = forwardRef<HTMLDivElement, WinnerCertificateProps>(
           display: "flex", justifyContent: "space-between", alignItems: "flex-end",
           borderTop: "1px solid rgba(44,62,80,0.10)", paddingTop: "12px",
         }}>
-          <div>
+
+          {/* LEFT: Company representative signature block */}
+          <div style={{ minWidth: "180px" }}>
+            {signatureUrl && (
+              <img
+                src={signatureUrl}
+                alt="Signature"
+                crossOrigin="anonymous"
+                style={{
+                  height: "36px", maxWidth: "160px", objectFit: "contain",
+                  marginBottom: "2px", display: "block",
+                }}
+              />
+            )}
+            <div style={{ width: "160px", height: "1px", background: cfg.accent, marginBottom: "4px" }} />
+            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1A252F" }}>
+              {representativeName ?? "ZamHack Platform"}
+            </div>
+            {representativeName && (
+              <div style={{ fontSize: "10px", color: "#7A909E", marginTop: "1px" }}>
+                {organizationName}
+              </div>
+            )}
+            {representativeName && (
+              <div style={{ fontSize: "9px", color: "#7A909E", textTransform: "uppercase",
+                letterSpacing: "0.08em", marginTop: "1px" }}>
+                Representative
+              </div>
+            )}
+          </div>
+
+          {/* CENTER: spacer */}
+          <div />
+
+          {/* RIGHT: Date awarded + verification URL */}
+          <div style={{ textAlign: "right", minWidth: "180px" }}>
             <div style={{ fontSize: "10px", color: "#7A909E", letterSpacing: "0.08em",
               textTransform: "uppercase" }}>Date Awarded</div>
             <div style={{ fontSize: "13px", color: "#2C3E50", fontWeight: "600", marginTop: "2px" }}>
               {awardDate}
             </div>
+            {verifyUrl && (
+              <div style={{ fontSize: "8px", color: "#A0B0BC", marginTop: "8px", letterSpacing: "0.02em" }}>
+                To verify, go to:
+                <br />
+                {verifyUrl}
+              </div>
+            )}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <div style={{ width: "52px", height: "52px", borderRadius: "50%",
-              background: "linear-gradient(135deg, #2C3E50 0%, #3D5166 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              border: `3px solid ${cfg.accentLight}`, boxShadow: "0 4px 16px rgba(44,62,80,0.25)" }}>
-              <svg width="26" height="26" viewBox="0 0 20 20" fill="none">
-                <path d="M10 2L12.5 7.5H18L13.5 11L15.5 17L10 13.5L4.5 17L6.5 11L2 7.5H7.5L10 2Z"
-                  fill={cfg.accentLight} />
-              </svg>
-            </div>
-            <span style={{ fontSize: "8px", color: "#7A909E", letterSpacing: "0.10em",
-              textTransform: "uppercase" }}>Official Seal</span>
-          </div>
-
-          <div style={{ textAlign: "right" }}>
-            <div style={{ width: "150px", height: "1px", background: "#2C3E50",
-              marginBottom: "4px", marginLeft: "auto" }} />
-            <div style={{ fontSize: "10px", color: "#7A909E", letterSpacing: "0.05em" }}>
-              ZamHack Platform
-            </div>
-          </div>
         </div>
       </div>
     )

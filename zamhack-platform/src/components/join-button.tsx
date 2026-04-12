@@ -23,10 +23,36 @@ interface JoinButtonProps {
   difficulty?: string
 }
 
+const DIFFICULTY_CONFIRM: Record<string, { title: string; description: string; actionLabel: string }> = {
+  intermediate: {
+    title: "Intermediate Challenge",
+    description:
+      "This is an Intermediate challenge, designed for participants with some hands-on experience. It may be more demanding than a Beginner challenge. Are you sure you want to join?",
+    actionLabel: "Yes, Join Challenge",
+  },
+  advanced: {
+    title: "Advanced Challenge",
+    description:
+      "This is an Advanced challenge, intended for experienced participants. It is significantly more difficult and competitive. Are you sure you want to join?",
+    actionLabel: "Yes, I'm Ready",
+  },
+}
+
 export function JoinButton({ challengeId, isFull = false, difficulty = "beginner" }: JoinButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null)
+  const [showDifficultyConfirm, setShowDifficultyConfirm] = useState(false)
   const router = useRouter()
+
+  const difficultyPrompt = DIFFICULTY_CONFIRM[difficulty] ?? null
+
+  const handleButtonClick = () => {
+    if (difficultyPrompt) {
+      setShowDifficultyConfirm(true)
+    } else {
+      handleJoin(false)
+    }
+  }
 
   const handleJoin = async (force: boolean = false) => {
     setIsLoading(true)
@@ -67,16 +93,42 @@ export function JoinButton({ challengeId, isFull = false, difficulty = "beginner
 
   return (
     <>
-      <Button 
-        size="lg" 
-        className={isFull ? "w-full" : ""} 
-        onClick={() => handleJoin(false)} 
+      <Button
+        size="lg"
+        className={isFull ? "w-full" : ""}
+        onClick={handleButtonClick}
         disabled={isLoading}
       >
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Join Challenge
       </Button>
 
+      {/* Difficulty confirmation — shown before joining intermediate / advanced challenges */}
+      {difficultyPrompt && (
+        <AlertDialog open={showDifficultyConfirm} onOpenChange={setShowDifficultyConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{difficultyPrompt.title}</AlertDialogTitle>
+              <AlertDialogDescription>{difficultyPrompt.description}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault()
+                  setShowDifficultyConfirm(false)
+                  handleJoin(false)
+                }}
+                disabled={isLoading}
+              >
+                {isLoading ? "Joining..." : difficultyPrompt.actionLabel}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Schedule overlap confirmation */}
       <AlertDialog open={!!overlapWarning} onOpenChange={(open) => !open && setOverlapWarning(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -87,9 +139,9 @@ export function JoinButton({ challengeId, isFull = false, difficulty = "beginner
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={(e) => {
-                e.preventDefault() // Prevent auto-close to show loading state
+                e.preventDefault()
                 handleJoin(true)
               }}
               disabled={isLoading}
