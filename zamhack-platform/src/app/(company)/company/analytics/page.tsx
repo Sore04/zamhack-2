@@ -1,24 +1,25 @@
 import { createClient } from "@/utils/supabase/server"
 import { redirect } from "next/navigation"
-import { Users, FileText, Star, TrendingUp } from "lucide-react"
 import {
-  TopSchoolsChart,
-  TopSkillsChart,
-  ChallengeComparisonChart,
-  SubmissionsOverTimeChart,
-  DegreeBreakdownChart,
   type TopSchool,
   type TopSkill,
   type ChallengePerf,
   type WeeklySubmission,
   type DegreeSlice,
 } from "@/components/company/analytics-charts"
-import { ChallengePerformanceTable } from "@/components/company/challenge-performance-table"
+import { AnalyticsDashboard } from "@/components/company/analytics-dashboard"
 
 // ── Data Fetching ──────────────────────────────────────────────────────────
 
 async function getAnalyticsData(organizationId: string) {
   const supabase = await createClient()
+
+  // Org name for the PDF header
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .single()
 
   // All challenges for this org
   const { data: challenges } = await supabase
@@ -29,7 +30,7 @@ async function getAnalyticsData(organizationId: string) {
   const challengeIds = (challenges || []).map(c => c.id)
 
   if (!challengeIds.length) {
-    return { challenges: [], overview: { totalParticipants: 0, totalSubmissions: 0, avgScore: null, completionRate: 0 }, topSchools: [], topSkills: [], challengePerformance: [], submissionsOverTime: [], degreeBreakdown: [] }
+    return { orgName: org?.name ?? "", challenges: [], overview: { totalParticipants: 0, totalSubmissions: 0, avgScore: null, completionRate: 0 }, topSchools: [], topSkills: [], challengePerformance: [], submissionsOverTime: [], degreeBreakdown: [] }
   }
 
   // All participants across all challenges
@@ -183,6 +184,7 @@ async function getAnalyticsData(organizationId: string) {
   const submissionsOverTime: WeeklySubmission[] = [...weeklyMap.entries()].map(([week, count]) => ({ week, count }))
 
   return {
+    orgName: org?.name ?? "",
     challenges: challenges || [],
     overview: { totalParticipants: uniqueParticipants, totalSubmissions, avgScore, completionRate },
     topSchools,
@@ -214,92 +216,5 @@ export default async function CompanyAnalyticsPage() {
   if (!profile.organization_id) redirect("/company/dashboard")
 
   const data = await getAnalyticsData(profile.organization_id)
-  const { overview, topSchools, topSkills, challengePerformance, submissionsOverTime, degreeBreakdown } = data
-
-  const statCards = [
-    { label: "Unique Participants",  value: overview.totalParticipants, icon: Users,     color: "var(--cp-coral)" },
-    { label: "Total Submissions",    value: overview.totalSubmissions,   icon: FileText,  color: "var(--cp-navy)" },
-    { label: "Avg Score",            value: overview.avgScore !== null ? `${overview.avgScore}` : "N/A", icon: Star, color: "#6366F1" },
-    { label: "Completion Rate",      value: `${overview.completionRate}%`, icon: TrendingUp, color: "#10B981" },
-  ]
-
-  return (
-    <div className="cp-page space-y-8">
-
-      {/* Header */}
-      <div className="cp-page-header">
-        <h1 className="cp-page-title">Talent <span>Analytics</span></h1>
-        <p className="cp-page-subtitle">Insights across all your challenges and participants.</p>
-      </div>
-
-      {/* Overview stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-        {statCards.map((s) => {
-          const Icon = s.icon
-          return (
-            <div key={s.label} className="cp-stat-card" style={{ background: "var(--cp-white)", border: "1px solid var(--cp-border)", borderRadius: "var(--cp-radius-xl)", padding: "1.25rem", boxShadow: "var(--cp-shadow-sm)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--cp-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</span>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${s.color}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Icon style={{ width: 18, height: 18, color: s.color }} />
-                </div>
-              </div>
-              <div style={{ fontSize: "2rem", fontWeight: 800, color: "var(--cp-navy)", letterSpacing: "-0.03em" }}>{s.value}</div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Row 1: Top Schools + Degree Breakdown */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-        <Section title="Top Schools" subtitle="Universities most represented across your challenges">
-          <TopSchoolsChart data={topSchools} />
-        </Section>
-        <Section title="Degree Breakdown" subtitle="Academic backgrounds of your participants">
-          <DegreeBreakdownChart data={degreeBreakdown} />
-        </Section>
-      </div>
-
-      {/* Row 2: Skills (full width) */}
-      <Section title="Participant Skills" subtitle="Top skills across all participants, stacked by proficiency level">
-        <TopSkillsChart data={topSkills} />
-      </Section>
-
-      {/* Row 3: Challenge comparison + Submissions over time */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-        <Section title="Challenge Comparison" subtitle="Participants vs submissions per challenge">
-          <ChallengeComparisonChart data={challengePerformance} />
-        </Section>
-        <Section title="Submission Activity" subtitle="Weekly submissions over the last 8 weeks">
-          <SubmissionsOverTimeChart data={submissionsOverTime} />
-        </Section>
-      </div>
-
-      {/* Row 4: Challenge performance table */}
-      <Section title="Challenge Performance" subtitle="Detailed stats per challenge">
-        {challengePerformance.length === 0 ? (
-          <p style={{ color: "var(--cp-text-muted)", fontSize: "0.875rem", padding: "2rem 0", textAlign: "center" }}>
-            No challenge data yet.
-          </p>
-        ) : (
-          <ChallengePerformanceTable data={challengePerformance} />
-        )}
-      </Section>
-
-    </div>
-  )
-}
-
-// ── Section wrapper ────────────────────────────────────────────────────────
-
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
-  return (
-    <div style={{ background: "var(--cp-white)", border: "1px solid var(--cp-border)", borderRadius: "var(--cp-radius-xl)", padding: "1.5rem", boxShadow: "var(--cp-shadow-sm)" }}>
-      <div style={{ marginBottom: "1.25rem" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--cp-navy)", letterSpacing: "-0.01em" }}>{title}</h2>
-        {subtitle && <p style={{ fontSize: "0.8125rem", color: "var(--cp-text-muted)", marginTop: 2 }}>{subtitle}</p>}
-      </div>
-      {children}
-    </div>
-  )
+  return <AnalyticsDashboard data={data} />
 }

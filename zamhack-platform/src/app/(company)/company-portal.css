@@ -46,6 +46,12 @@
   --cp-grad-navy:      linear-gradient(135deg, #2C3E50 0%, #1A252F 100%);
   --cp-grad-surface:   linear-gradient(135deg, #F8F9FB 0%, #EEF1F5 100%);
   --cp-grad-hero:      linear-gradient(135deg, #2C3E50 0%, #3D5166 40%, #E8836F 100%);
+
+  --cp-indigo:             #6366F1;
+  --cp-emerald:            #10B981;
+  --cp-backdrop:           rgba(44, 62, 80, 0.18);
+  --cp-coral-alpha-30:     rgba(232, 131, 111, 0.30);
+  --cp-coral-alpha-20:     rgba(232, 131, 111, 0.20);
 }
 
 
@@ -1258,4 +1264,82 @@ aside > div {
 [data-portal="company"] [class*="sidebar-accent"] {
   background: var(--cp-coral-muted) !important;
   color: var(--cp-coral-dark) !important;
+}
+
+/* =============================================
+   ANALYTICS DASHBOARD
+   ============================================= */
+
+.cp-analytics-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  gap: 1rem;
+}
+
+.cp-analytics-empty-icon {
+  color: var(--cp-text-muted);
+  opacity: 0.5;
+}
+
+.cp-analytics-empty-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--cp-navy);
+  letter-spacing: -0.02em;
+}
+
+.cp-analytics-empty-text {
+  font-size: 0.9rem;
+  color: var(--cp-text-muted);
+  max-width: 360px;
+}
+
+.cp-kpi-icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  background: var(--cp-coral-muted);
+  border-radius: var(--cp-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-coral-dark);
+  margin-bottom: 0.875rem;
+}
+
+.cp-kpi-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--cp-text-muted);
+  background: var(--cp-surface-2);
+  padding: 0.125rem 0.5rem;
+  border-radius: 99px;
+}
+
+/* Filter drawer overlay backdrop */
+.cp-filter-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--cp-backdrop);
+  z-index: 40;
+}
+
+/* Filter drawer panel */
+.cp-filter-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 320px;
+  background: var(--cp-white);
+  border-left: 1px solid var(--cp-border);
+  box-shadow: var(--cp-shadow-lg);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
