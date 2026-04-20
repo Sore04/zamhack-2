@@ -61,28 +61,35 @@ export default async function MyChallengesPage() {
   //    completionMap: challengeId → true if submitted >= total milestones > 0
   const completionMap = new Map<string, boolean>()
 
-  for (const participation of allParticipations) {
-    const challengeId = participation.challenge_id as string
+const participantIds = allParticipations.map((p) => p.id)
 
-    const { count: milestoneCount } = await supabase
-      .from("milestones")
-      .select("*", { count: "exact", head: true })
-      .eq("challenge_id", challengeId)
+const [milestonesResult, submissionsResult] = await Promise.all([
+  challengeIds.length > 0
+    ? supabase.from("milestones").select("challenge_id").in("challenge_id", challengeIds)
+    : { data: [] },
+  participantIds.length > 0
+    ? supabase.from("submissions").select("participant_id").in("participant_id", participantIds)
+    : { data: [] },
+])
 
-    const { count: submissionCount } = await supabase
-      .from("submissions")
-      .select("*", { count: "exact", head: true })
-      .eq("participant_id", participation.id)
+// Count milestones per challenge
+const milestoneCountMap = new Map<string, number>()
+for (const m of milestonesResult.data ?? []) {
+  milestoneCountMap.set(m.challenge_id, (milestoneCountMap.get(m.challenge_id) ?? 0) + 1)
+}
 
-    const total = milestoneCount ?? 0
-    const submitted = submissionCount ?? 0
-    completionMap.set(challengeId, total > 0 && submitted >= total)
-  }
+// Count submissions per participant
+const submissionCountMap = new Map<string, number>()
+for (const s of submissionsResult.data ?? []) {
+  submissionCountMap.set(s.participant_id, (submissionCountMap.get(s.participant_id) ?? 0) + 1)
+}
 
-  // Helper: uses the dedicated perpetualSet, no TypeScript type dependency
-  function isPerpetualChallenge(challenge: ChallengeWithOrg): boolean {
-    return perpetualSet.has(challenge.id)
-  }
+for (const participation of allParticipations) {
+  const challengeId = participation.challenge_id as string
+  const total = milestoneCountMap.get(challengeId) ?? 0
+  const submitted = submissionCountMap.get(participation.id) ?? 0
+  completionMap.set(challengeId, total > 0 && submitted >= total)
+}
 
   // 4. Sort: perpetual + all milestones done → Past. Everything else follows status.
   const challengeMap = new Map(challenges.map((c) => [c.id, c]))
@@ -93,7 +100,7 @@ export default async function MyChallengesPage() {
     const challenge = challengeMap.get(participation.challenge_id as string)
     if (!challenge) continue
 
-    const isPerpetual = isPerpetualChallenge(challenge)
+    const isPerpetual = perpetualSet.has(challenge.id)
     const isCompleted = completionMap.get(challenge.id) ?? false
     const isStatusPast = PAST_CHALLENGE_STATUSES.includes(challenge.status as string)
     const isEnded = challenge.end_date ? new Date(challenge.end_date) < new Date() : false
@@ -159,7 +166,7 @@ export default async function MyChallengesPage() {
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {pastChallenges.map((challenge) => {
-                  const isPerpetual = isPerpetualChallenge(challenge)
+                  const isPerpetual = perpetualSet.has(challenge.id)
                   const isCompleted = completionMap.get(challenge.id) ?? false
                   return (
                     <ChallengeCard
