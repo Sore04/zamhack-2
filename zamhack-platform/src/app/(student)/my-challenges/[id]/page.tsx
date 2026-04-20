@@ -11,7 +11,7 @@ import { RubricCriteriaCard } from "@/components/rubric-criteria-card"
 import { AlertCircle, CheckCircle2, Lock, MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { computeFinalScore, splitEvaluationsByRole, type ScoringMode } from "@/lib/scoring-utils"
-
+import { WithdrawButton } from "@/components/withdraw-button"
 
 type Challenge = Database["public"]["Tables"]["challenges"]["Row"]
 type Organization = Database["public"]["Tables"]["organizations"]["Row"]
@@ -286,9 +286,10 @@ export default async function ChallengeProgressPage({
         </div>
         <div className="flex gap-2">
          <MessageCompanyButton challengeId={challenge.id} />
-          <Button variant="outline" disabled>
-            Withdraw
-          </Button>
+          <WithdrawButton
+            challengeId={challenge.id}
+            challengeTitle={challenge.title}
+        />
         </div>
       </div>
 
