@@ -38,11 +38,13 @@ export default function SettingsPage() {
         setError(result.error)
       } else if (result.success) {
         setSuccess("Password updated successfully!")
+        setError(null)
         e.currentTarget.reset()
       }
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
-    } finally {
+    } catch (err: any) {
+    
+   }
+    finally {
       setIsSubmitting(false)
     }
   }
