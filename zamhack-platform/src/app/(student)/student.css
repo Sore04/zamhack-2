@@ -1078,7 +1078,7 @@
 }
 
 /* Identity */
-.student-portal .pf-hero-info { flex: 1; padding-top: 1rem; min-width: 0; }
+.student-portal .pf-hero-info { flex: 1; padding-top: 2.5rem; min-width: 0; }
 
 .student-portal .pf-hero-name-row {
   display: flex;

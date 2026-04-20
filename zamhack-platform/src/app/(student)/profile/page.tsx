@@ -5,6 +5,7 @@ import { Database } from "@/types/supabase"
 import { redirect } from "next/navigation"
 import { Github, Linkedin, FileText, GraduationCap, BookOpen, ExternalLink } from "lucide-react"
 import { XpCard } from "@/components/profile/xp-card"
+import { AvatarUpload } from "@/components/avatar-upload"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Profile = Database["public"]["Tables"]["profiles"]["Row"]
@@ -86,7 +87,9 @@ export default async function ProfilePage() {
   const { profile, user, xpSettings, studentSkills, allSkills, earnedSkills } = await getProfileData()
 
   const fullName = profile
-    ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
+    ? [profile.first_name, (profile as any).middle_name, profile.last_name]
+      .filter(Boolean)
+      .join(" ") || "User"
     : "User"
 
   const headline = profile
@@ -110,17 +113,10 @@ export default async function ProfilePage() {
 
         <div className="pf-hero-body">
           {/* Avatar */}
-          <div className="pf-avatar-wrapper">
-            {profile?.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={fullName}
-                className="pf-avatar-img"
-              />
-            ) : (
-              <span className="pf-avatar-initials">{initials}</span>
-            )}
-          </div>
+          <AvatarUpload
+            currentUrl={profile?.avatar_url ?? null}
+            initials={initials}
+          />
 
           {/* Identity + edit button */}
           <div className="pf-hero-info">
