@@ -22,6 +22,14 @@ interface OrgFormProps {
   organization: Organization
 }
 
+function parseRepName(fullName: string | null) {
+  if (!fullName) return { first: "", middle: "", last: "" }
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length === 1) return { first: parts[0], middle: "", last: "" }
+  if (parts.length === 2) return { first: parts[0], middle: "", last: parts[1] }
+  return { first: parts[0], middle: parts.slice(1, -1).join(" "), last: parts[parts.length - 1] }
+}
+
 const INDUSTRIES = [
   "Technology", "Fintech", "EdTech", "Healthcare", "E-commerce",
   "Media & Entertainment", "Logistics", "Agriculture", "Manufacturing",
@@ -239,16 +247,36 @@ export function OrgForm({ organization }: OrgFormProps) {
 
             {/* Representative Name */}
             <div className="cp-form-group" style={{ marginBottom: 0 }}>
-              <label htmlFor="representative_name" className="cp-label">
-                Representative Name
-              </label>
-              <input
-                id="representative_name"
-                name="representative_name"
-                className="cp-input"
-                defaultValue={(organization as any).representative_name || ""}
-                placeholder="e.g. Jane Smith"
-              />
+              <label className="cp-label">Representative Name</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.875rem" }}>
+                <div>
+                  <input
+                    id="rep_first_name"
+                    name="rep_first_name"
+                    className="cp-input"
+                    defaultValue={parseRepName((organization as any).representative_name).first}
+                    placeholder="First name"
+                  />
+                </div>
+                <div>
+                  <input
+                    id="rep_middle_name"
+                    name="rep_middle_name"
+                    className="cp-input"
+                    defaultValue={parseRepName((organization as any).representative_name).middle}
+                    placeholder="Middle name (optional)"
+                  />
+                </div>
+                <div>
+                  <input
+                    id="rep_last_name"
+                    name="rep_last_name"
+                    className="cp-input"
+                    defaultValue={parseRepName((organization as any).representative_name).last}
+                    placeholder="Last name"
+                  />
+                </div>
+              </div>
               <p style={{ fontSize: "0.75rem", color: "var(--cp-text-muted)", marginTop: "0.375rem" }}>
                 The name printed on certificates issued for your challenges.
               </p>

@@ -20,13 +20,15 @@ export async function GET(req: NextRequest) {
   const now = new Date().toISOString()
 
   // 1. Activate approved challenges whose start_date has passed
-  const { count: activated } = await supabase
+  const { data: activatedRows } = await supabase
     .from("challenges")
     .update({ status: "in_progress" })
     .eq("status", "approved")
     .eq("is_perpetual", false)
     .lte("start_date", now)
-    .select("id", { count: "exact", head: true })
+    .select("id")
+
+  const activated = activatedRows?.length ?? 0
 
   // 2. Find in_progress non-perpetual challenges past their end_date
   const { data: overdue } = await supabase

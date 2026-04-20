@@ -13,6 +13,7 @@ export async function updateProfile(formData: FormData) {
   if (!user) return { error: "Not authenticated" }
 
   const firstName = formData.get("firstName") as string
+  const middleName = formData.get("middleName") as string
   const lastName = formData.get("lastName") as string
   const bio = formData.get("bio") as string
 
@@ -20,6 +21,7 @@ export async function updateProfile(formData: FormData) {
     .from("profiles")
     .update({
       first_name: firstName || null,
+      middle_name: middleName || null,
       last_name: lastName || null,
       bio: bio || null,
       updated_at: new Date().toISOString(),

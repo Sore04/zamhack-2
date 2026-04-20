@@ -128,7 +128,7 @@ export default function ProfileForm({ profile, email }: ProfileFormProps) {
               </div>
 
               {/* Name row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.875rem" }}>
                 <div className="cp-form-group" style={{ marginBottom: 0 }}>
                   <label htmlFor="firstName" className="cp-label">First Name</label>
                   <input
@@ -137,6 +137,18 @@ export default function ProfileForm({ profile, email }: ProfileFormProps) {
                     className="cp-input"
                     defaultValue={profile.first_name || ""}
                     placeholder="First name"
+                  />
+                </div>
+                <div className="cp-form-group" style={{ marginBottom: 0 }}>
+                  <label htmlFor="middleName" className="cp-label">
+                    Middle Name <span style={{ fontWeight: 400, color: "var(--cp-text-muted)" }}>(optional)</span>
+                  </label>
+                  <input
+                    id="middleName"
+                    name="middleName"
+                    className="cp-input"
+                    defaultValue={profile.middle_name || ""}
+                    placeholder="Middle name"
                   />
                 </div>
                 <div className="cp-form-group" style={{ marginBottom: 0 }}>
@@ -406,7 +418,7 @@ export default function ProfileForm({ profile, email }: ProfileFormProps) {
               )}
             </div>
             <p style={{ fontWeight: 800, fontSize: "1rem", color: "var(--cp-navy)", letterSpacing: "-0.01em" }}>
-              {`${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Your Name"}
+              {[profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ") || "Your Name"}
             </p>
             <p style={{ fontSize: "0.8rem", color: "var(--cp-text-muted)", marginTop: "0.2rem" }}>
               {email}

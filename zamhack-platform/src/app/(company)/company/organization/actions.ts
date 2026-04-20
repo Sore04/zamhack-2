@@ -41,7 +41,10 @@ export async function updateOrganization(orgId: string, formData: FormData) {
   const description = formData.get("description") as string
   const website = formData.get("website") as string
   const logo_url = formData.get("logo_url") as string
-  const representative_name = formData.get("representative_name") as string
+  const repFirst = (formData.get("rep_first_name") as string || "").trim()
+  const repMiddle = (formData.get("rep_middle_name") as string || "").trim()
+  const repLast = (formData.get("rep_last_name") as string || "").trim()
+  const representative_name = [repFirst, repMiddle, repLast].filter(Boolean).join(" ")
   const signatureFile = formData.get("signature_file")
 
   if (!name) return { error: "Company name is required" }

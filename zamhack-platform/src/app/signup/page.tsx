@@ -146,7 +146,6 @@ export default function SignupPage() {
             {/* STUDENT FORM */}
             <TabsContent value="student">
               <form onSubmit={studentForm.handleSubmit(onSubmit)} className="space-y-4">
-                {/* Changed grid-cols-2 to grid-cols-3 for First, Middle, Last */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>First Name</Label>
@@ -154,8 +153,8 @@ export default function SignupPage() {
                     {studentForm.formState.errors.firstName && <p className="text-xs text-red-500">{studentForm.formState.errors.firstName.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label>Middle Name <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                    <Input {...studentForm.register("middleName")} disabled={isSubmitting} />
+                    <Label>Middle Name</Label>
+                    <Input {...studentForm.register("middleName")} placeholder="Optional" disabled={isSubmitting} />
                   </div>
                   <div className="space-y-2">
                     <Label>Last Name</Label>
@@ -201,8 +200,8 @@ export default function SignupPage() {
                     {companyForm.formState.errors.firstName && <p className="text-xs text-red-500">{companyForm.formState.errors.firstName.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label>Middle Name <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                    <Input {...companyForm.register("middleName")} disabled={isSubmitting} />
+                    <Label>Middle Name</Label>
+                    <Input {...companyForm.register("middleName")} placeholder="Optional" disabled={isSubmitting} />
                   </div>
                   <div className="space-y-2">
                     <Label>Last Name</Label>
