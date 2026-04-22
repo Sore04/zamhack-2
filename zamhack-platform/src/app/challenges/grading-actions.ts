@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/server"
 import { Database } from "@/types/supabase"
 import { awardXp } from "@/lib/award-xp"
 import { getFinalScore, type ScoringMode } from "@/lib/scoring-utils"
+import { logActivity, ActivityAction } from "@/lib/activity-log"
 
 type EvaluationInsert = Database["public"]["Tables"]["evaluations"]["Insert"]
 type EvaluationUpdate = Database["public"]["Tables"]["evaluations"]["Update"]
@@ -113,7 +114,7 @@ export async function submitEvaluation(
 
   const { data: existingEvaluation } = await supabase
     .from("evaluations")
-    .select("id")
+    .select("id, is_draft")
     .eq("submission_id", submissionId)
     .eq("reviewer_id", user.id)
     .maybeSingle()
@@ -137,6 +138,21 @@ export async function submitEvaluation(
 
     if (updateError) {
       evalError = { error: updateError.message || "Failed to update evaluation" }
+    } else if (existingEvaluation.is_draft === false && !isDraft) {
+      // A previously submitted evaluation was edited — log it.
+      await logActivity({
+        log_type: isEvaluator ? "admin" : "company",
+        actor_id: user.id,
+        action: ActivityAction.EVALUATION_EDITED,
+        entity_type: "submission",
+        entity_id: submissionId,
+        metadata: {
+          challenge_id: challenge.id,
+          submission_id: submissionId,
+          new_score: totalScore,
+          new_feedback: feedback,
+        },
+      })
     }
   } else {
     const { error: insertError } = await supabase

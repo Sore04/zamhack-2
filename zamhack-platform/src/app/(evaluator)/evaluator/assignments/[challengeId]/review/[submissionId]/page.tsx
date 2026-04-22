@@ -213,6 +213,7 @@ export default async function EvaluatorReviewPage({
             rubrics={rubrics || []}
             existingScores={(myScores as any) || []}
             initialEvaluation={myEvaluation || null}
+            readOnly={myEvaluation?.is_draft === false}
           />
         </div>
       </div>

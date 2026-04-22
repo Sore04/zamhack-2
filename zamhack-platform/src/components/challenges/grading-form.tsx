@@ -59,17 +59,21 @@ interface GradingFormProps {
   rubrics: Rubric[]
   existingScores: Score[]
   initialEvaluation?: Evaluation | null
+  readOnly?: boolean
 }
 
 // --- Simple Score Form (no rubrics defined) ---
 function SimpleGradingForm({
   submissionId,
   initialEvaluation,
+  readOnly: initialReadOnly,
 }: {
   submissionId: string
   initialEvaluation?: Evaluation | null
+  readOnly?: boolean
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [readOnly, setReadOnly] = useState(initialReadOnly ?? false)
   const isSubmittingRef = useRef(false)
 
   const form = useForm<SimpleGradingFormValues>({
@@ -110,6 +114,30 @@ function SimpleGradingForm({
       isSubmittingRef.current = false
       setIsSubmitting(false)
     }
+  }
+
+  if (readOnly) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Label className="text-base font-semibold">
+            Score <span className="text-muted-foreground font-normal">(out of 100)</span>
+          </Label>
+          <p className="text-2xl font-bold text-primary">
+            {initialEvaluation?.score ?? 0} / 100
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label>Overall Feedback</Label>
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {initialEvaluation?.feedback || "No feedback provided."}
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => setReadOnly(false)}>
+          Edit Submitted Review
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -201,8 +229,10 @@ export const GradingForm = ({
   rubrics,
   existingScores,
   initialEvaluation,
+  readOnly: initialReadOnly,
 }: GradingFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [readOnly, setReadOnly] = useState(initialReadOnly ?? false)
   const isSubmittingRef = useRef(false)
 
   const defaultRubricScores = rubrics.map(rubric => {
@@ -274,7 +304,44 @@ export const GradingForm = ({
             <p className="text-sm text-muted-foreground pb-2 border-b">
               No rubrics have been defined for this challenge. Enter a direct score out of 100.
             </p>
-            <SimpleGradingForm submissionId={submissionId} initialEvaluation={initialEvaluation} />
+            <SimpleGradingForm
+              submissionId={submissionId}
+              initialEvaluation={initialEvaluation}
+              readOnly={readOnly}
+            />
+          </div>
+        ) : readOnly ? (
+          /* --- READ-ONLY: submitted evaluation display --- */
+          <div className="space-y-6">
+            <div className="space-y-4">
+              {defaultRubricScores.map((item) => (
+                <div key={item.rubric_id} className="flex justify-between items-center border-b pb-3 last:border-0">
+                  <span className="text-sm font-medium">{item.criteria_name}</span>
+                  <span className="text-sm font-bold">
+                    {item.score} / {item.max_points}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-muted/30 p-4 rounded-lg border flex justify-between items-center">
+              <span className="font-bold text-lg">Total Score</span>
+              <div className="text-2xl font-bold">
+                <span className="text-primary">{currentTotal}</span>
+                <span className="text-muted-foreground text-lg font-normal"> / {maxTotal}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Overall Feedback</Label>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {initialEvaluation?.feedback || "No feedback provided."}
+              </p>
+            </div>
+
+            <Button variant="outline" onClick={() => setReadOnly(false)}>
+              Edit Submitted Review
+            </Button>
           </div>
         ) : (
           /* --- HAS RUBRICS: rubric-based form --- */

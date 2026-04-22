@@ -924,14 +924,13 @@ export async function resolveTie(params: {
   if (
     !profile ||
     (profile.role !== "admin" &&
-      profile.role !== "company_admin" &&
-      profile.role !== "company_member")
+      profile.role !== "company_admin")
   ) {
     return { success: false, error: "Unauthorized" }
   }
 
   // 2. Company org ownership check
-  if (profile.role === "company_admin" || profile.role === "company_member") {
+  if (profile.role === "company_admin") {
     const { data: challenge } = await supabase
       .from("challenges")
       .select("organization_id")

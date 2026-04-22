@@ -420,6 +420,7 @@ export default async function SubmissionReviewPage({
             initialEvaluation={evaluation}
             rubrics={rubrics}
             existingScores={scores}
+            readOnly={evaluation?.is_draft === false}
           />
         </div>
       </div>

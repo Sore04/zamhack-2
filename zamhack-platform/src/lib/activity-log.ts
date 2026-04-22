@@ -16,6 +16,9 @@ export const ActivityAction = {
   EVALUATOR_ASSIGNED:     'evaluator.assigned',
   EVALUATOR_REMOVED:      'evaluator.removed',
 
+  // Evaluation actions
+  EVALUATION_EDITED:      'evaluation.edited',
+
   // Company actions
   CHALLENGE_CREATED:      'challenge.created',
   CHALLENGE_EDITED:       'challenge.edited',

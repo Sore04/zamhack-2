@@ -447,6 +447,40 @@ export async function setChiefEvaluator(
 
   if (profile?.role !== "admin") return { success: false, error: "Unauthorized" }
 
+  // Guard: block reassignment once any non-draft evaluation exists for this challenge.
+  // Step 1 — collect all milestone IDs for this challenge.
+  const { data: milestoneRows } = await supabase
+    .from("milestones")
+    .select("id")
+    .eq("challenge_id", challengeId)
+
+  const milestoneIds = (milestoneRows ?? []).map((m) => m.id)
+
+  if (milestoneIds.length > 0) {
+    // Step 2 — count finalized evaluations on submissions for those milestones.
+    const { data: submissionRows } = await supabase
+      .from("submissions")
+      .select("id")
+      .in("milestone_id", milestoneIds)
+
+    const submissionIds = (submissionRows ?? []).map((s) => s.id)
+
+    if (submissionIds.length > 0) {
+      const { count } = await supabase
+        .from("evaluations")
+        .select("id", { count: "exact", head: true })
+        .in("submission_id", submissionIds)
+        .eq("is_draft", false)
+
+      if ((count ?? 0) > 0) {
+        return {
+          success: false,
+          error: "Cannot reassign chief evaluator after evaluations have begun.",
+        }
+      }
+    }
+  }
+
   // Clear any existing chief for this challenge
   const { error: clearError } = await (supabase
     .from("challenge_evaluators")
