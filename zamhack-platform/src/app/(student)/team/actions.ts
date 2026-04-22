@@ -34,7 +34,7 @@ export async function createTeam(name: string) {
   const { data: existingTeamMember } = await supabase
     .from("team_members")
     .select("team_id")
-    .eq("profile_id", user.id)
+    .eq("profile_id", user!.id)
     .maybeSingle()
 
   if (existingTeamMember) {
@@ -92,7 +92,7 @@ export async function joinTeam(code: string) {
   const { data: existingTeamMember } = await supabase
     .from("team_members")
     .select("team_id")
-    .eq("profile_id", user.id)
+    .eq("profile_id", user!.id)
     .maybeSingle()
 
   if (existingTeamMember) {
