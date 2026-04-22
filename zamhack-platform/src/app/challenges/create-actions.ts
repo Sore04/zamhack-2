@@ -11,7 +11,7 @@ type ProficiencyLevel = Database["public"]["Enums"]["proficiency_level"]
 interface MilestoneInput {
   title: string
   description?: string
-  dueDate: string
+  dueDate: string | null
   requiresGithub: boolean
   requiresUrl: boolean
   requiresText: boolean
@@ -171,6 +171,13 @@ export const createChallenge = async (
     for (const milestone of input.milestones) {
       if (!milestone.requiresGithub && !milestone.requiresUrl && !milestone.requiresText) {
         return { success: false, error: `Milestone "${milestone.title}" must require at least one submission type.` }
+      }
+      if (milestone.dueDate) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        if (new Date(milestone.dueDate) < today) {
+          return { success: false, error: `Milestone "${milestone.title}" due date cannot be in the past.` }
+        }
       }
     }
 

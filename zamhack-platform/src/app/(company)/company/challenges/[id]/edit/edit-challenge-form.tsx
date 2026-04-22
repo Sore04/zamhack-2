@@ -176,6 +176,15 @@ export default function EditChallengeForm({
         setLoading(false);
         return;
       }
+      if (m.due_date) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (new Date(m.due_date) < today) {
+          setError(`Milestone "${m.title || "Untitled"}" due date cannot be in the past.`);
+          setLoading(false);
+          return;
+        }
+      }
     }
 
     try {
@@ -369,7 +378,15 @@ export default function EditChallengeForm({
         {/* Perpetual toggle */}
         <label className="flex items-center gap-3 cursor-pointer select-none">
           <div
-            onClick={() => setIsPerpetual((v) => !v)}
+            onClick={() => {
+              setIsPerpetual((v) => {
+                const next = !v;
+                if (next) {
+                  setMilestones((prev) => prev.map((m) => ({ ...m, due_date: "" })));
+                }
+                return next;
+              });
+            }}
             className={`relative w-10 h-6 rounded-full transition-colors cursor-pointer ${
               isPerpetual ? "bg-orange-500" : "bg-gray-300"
             }`}
@@ -542,15 +559,20 @@ export default function EditChallengeForm({
               />
             </Field>
 
-            <Field label="Due Date">
-              <input
-                title="Due Date"
-                type="datetime-local"
-                className={inputCls}
-                value={m.due_date}
-                onChange={(e) => updateMilestone(i, "due_date", e.target.value)}
-              />
-            </Field>
+            {isPerpetual ? (
+              <p className="text-xs text-gray-500">Due dates are not applicable for perpetual challenges.</p>
+            ) : (
+              <Field label="Due Date">
+                <input
+                  title="Due Date"
+                  type="datetime-local"
+                  className={inputCls}
+                  value={m.due_date}
+                  onChange={(e) => updateMilestone(i, "due_date", e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+              </Field>
+            )}
 
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-2 cursor-pointer">

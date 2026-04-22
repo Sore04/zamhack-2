@@ -30,9 +30,7 @@ const criterionSchema = z.object({
 const milestoneSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  dueDate: z.date({
-    required_error: "Due date is required",
-  }),
+  dueDate: z.date().optional(),
   requiresGithub: z.boolean().default(false),
   requiresUrl: z.boolean().default(false),
   requiresText: z.boolean().default(false),
@@ -42,6 +40,17 @@ const milestoneSchema = z.object({
   {
     message: "At least one submission type must be selected",
     path: ["requiresGithub"],
+  }
+).refine(
+  (m) => {
+    if (!m.dueDate) return true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return m.dueDate >= today;
+  },
+  {
+    message: "Milestone due date cannot be in the past",
+    path: ["dueDate"],
   }
 )
 
@@ -110,6 +119,18 @@ const formSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Please specify the onsite location (or enter TBA)",
       path: ["locationDetails"],
+    })
+  }
+  // Perpetual challenges must not have milestone due dates
+  if (data.isPerpetual) {
+    data.milestones.forEach((m, index) => {
+      if (m.dueDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Perpetual challenges cannot have milestone due dates",
+          path: ["milestones", index, "dueDate"],
+        })
+      }
     })
   }
 })
@@ -290,7 +311,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
         currency: data.requiresEntryFee ? (data.currency || "PHP") : undefined,
         milestones: data.milestones.map(m => ({
           ...m,
-          dueDate: m.dueDate.toISOString()
+          dueDate: m.dueDate?.toISOString() ?? null,
         })),
         organizationId,
       })
@@ -578,6 +599,10 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                       if (val) {
                         form.setValue("endDate", undefined)
                         form.clearErrors("endDate")
+                        form.getValues("milestones").forEach((_, i) => {
+                          form.setValue(`milestones.${i}.dueDate`, undefined)
+                          form.clearErrors(`milestones.${i}.dueDate`)
+                        })
                       }
                     }}
                   />
@@ -709,34 +734,43 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                         rows={2}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Due Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            type="button"
-                            className={cn("w-full justify-start text-left font-normal", !watchedValues.milestones[index]?.dueDate && "text-muted-foreground")}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {watchedValues.milestones[index]?.dueDate
-                              ? format(watchedValues.milestones[index].dueDate, "PPP")
-                              : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={watchedValues.milestones[index]?.dueDate}
-                            onSelect={(date) => date && form.setValue(`milestones.${index}.dueDate`, date, { shouldValidate: true })}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      {form.formState.errors.milestones?.[index]?.dueDate && (
-                        <p className="text-xs text-destructive">{form.formState.errors.milestones[index]?.dueDate?.message}</p>
-                      )}
-                    </div>
+                    {watchedValues.isPerpetual ? (
+                      <p className="text-xs text-muted-foreground">Due dates are not applicable for perpetual challenges.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>Due Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              type="button"
+                              className={cn("w-full justify-start text-left font-normal", !watchedValues.milestones[index]?.dueDate && "text-muted-foreground")}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {watchedValues.milestones[index]?.dueDate
+                                ? format(watchedValues.milestones[index].dueDate, "PPP")
+                                : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={watchedValues.milestones[index]?.dueDate}
+                              onSelect={(date) => date && form.setValue(`milestones.${index}.dueDate`, date, { shouldValidate: true })}
+                              disabled={(date) => {
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                return date < today;
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        {form.formState.errors.milestones?.[index]?.dueDate && (
+                          <p className="text-xs text-destructive">{form.formState.errors.milestones[index]?.dueDate?.message}</p>
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Required Submission Types</Label>
                       <div className="flex gap-4">
