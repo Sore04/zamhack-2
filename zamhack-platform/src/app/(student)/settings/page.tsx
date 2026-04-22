@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { updatePassword } from "@/app/settings/actions"
 import { AlertCircle, Shield, Bell, Trash2, CheckCircle2, Eye, EyeOff } from "lucide-react"
+import { toast } from "sonner"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -50,7 +51,7 @@ export default function SettingsPage() {
   }
 
   const handleDeleteAccount = () => {
-    alert("Please contact admin to delete account")
+    toast.error("To delete your account, please contact support@zamhack.com")
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -233,7 +234,7 @@ export default function SettingsPage() {
               </div>
               <button onClick={handleDeleteAccount} className="st-btn-danger">
                 <Trash2 size={14} />
-                Delete
+                Delete Account
               </button>
             </div>
           </div>

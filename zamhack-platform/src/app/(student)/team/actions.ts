@@ -20,6 +20,8 @@ function generateJoinCode(): string {
 }
 
 export async function createTeam(name: string) {
+  return { error: "Team features are currently unavailable." }
+
   const supabase = await createClient()
 
   const {
@@ -77,6 +79,8 @@ export async function createTeam(name: string) {
 }
 
 export async function joinTeam(code: string) {
+  return { error: "Team features are currently unavailable." }
+
   const supabase = await createClient()
 
   const {

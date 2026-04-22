@@ -36,12 +36,6 @@ type Rubric = Database["public"]["Tables"]["rubrics"]["Row"]
 type ChallengeParticipant =
   Database["public"]["Tables"]["challenge_participants"]["Row"]
 
-interface TeamData {
-  id: string
-  name: string
-  leader_id: string | null
-}
-
 interface ChallengeProgressData {
   challenge: Challenge & { organization: Organization | null }
   milestones: Milestone[]
@@ -49,7 +43,6 @@ interface ChallengeProgressData {
   submissions: Submission[]
   evaluations: Evaluation[]
   rubrics: Rubric[]
-  userTeam: TeamData | null
   userId: string
   studentName: string
   gateStatus: GateResult
@@ -135,16 +128,7 @@ async function getChallengeData(
     .eq("challenge_id", id)
     .order("created_at", { ascending: true })
 
-  // 6. Team
-  const { data: teamMember } = await supabase
-    .from("team_members")
-    .select("team:teams(id, name, leader_id)")
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  const userTeam = (teamMember?.team as unknown as TeamData | null) ?? null
-
-  // 7. Profile (for certificate)
+  // 6. Profile (for certificate)
   const { data: profile } = await supabase
     .from("profiles")
     .select("first_name, last_name")
@@ -193,7 +177,6 @@ async function getChallengeData(
     submissions,
     evaluations,
     rubrics: rubrics || [],
-    userTeam,
     userId: user.id,
     studentName,
     gateStatus,
@@ -257,7 +240,6 @@ export default async function ChallengePage({
     submissions,
     evaluations,
     rubrics,
-    userTeam,
     userId,
     studentName,
     gateStatus,
@@ -672,8 +654,6 @@ export default async function ChallengePage({
                       <SubmissionForm
                         milestoneId={milestone.id}
                         participantId={participant.id}
-                        teamId={userTeam?.id || undefined}
-                        isTeamLeader={userTeam?.leader_id === userId}
                         requiresGithub={milestone.requires_github}
                         requiresUrl={milestone.requires_url}
                         requiresText={milestone.requires_text}

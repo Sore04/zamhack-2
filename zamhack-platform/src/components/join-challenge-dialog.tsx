@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { joinChallenge } from "@/app/challenges/actions"
-import { User, Users } from "lucide-react"
+import { User } from "lucide-react"
 
 interface UserTeam {
   id: string
@@ -115,9 +115,6 @@ export const JoinChallengeDialog = ({
     )
   }
 
-  // If team exists, show dialog with options
-  const isLeader = userId === userTeam.leader_id
-
   return (
     <div className="relative">
       <Dialog open={open} onOpenChange={setOpen}>
@@ -152,32 +149,6 @@ export const JoinChallengeDialog = ({
                   <div className="flex-1">
                     <CardTitle className="text-base">Join Solo</CardTitle>
                     <CardDescription>Participate as yourself</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
-
-            {/* Team Option */}
-            <Card
-              className={`transition-colors ${
-                isLeader && !registrationClosed && !isLoading
-                  ? "cursor-pointer hover:bg-accent"
-                  : "opacity-60 cursor-not-allowed"
-              }`}
-              onClick={() => isLeader && !isLoading && !registrationClosed && handleJoin(userTeam.id)}
-            >
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <CardTitle className="text-base">Join as {userTeam.name}</CardTitle>
-                    <CardDescription>
-                      {isLeader
-                        ? "Register your team for this challenge"
-                        : "Only team leaders can register the team"}
-                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>

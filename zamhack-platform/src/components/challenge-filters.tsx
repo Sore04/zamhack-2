@@ -188,7 +188,7 @@ const toggleIndustry = (industry: string) => {
           <SelectContent>
             <SelectItem value="all">Solo & Team</SelectItem>
             <SelectItem value="solo">👤 Solo</SelectItem>
-            <SelectItem value="team">👥 Team</SelectItem>
+            <SelectItem value="team" disabled>👥 Team (Coming Soon)</SelectItem>
           </SelectContent>
         </Select>
 

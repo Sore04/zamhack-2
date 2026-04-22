@@ -10,6 +10,7 @@ import {
   Settings,
   Shield,
   ScrollText,
+  MessageSquare,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LogoutButton } from "@/components/logout-button"
@@ -23,6 +24,7 @@ const adminNavItems = [
   { href: "/admin/challenges", label: "Challenge Management", icon: Briefcase },
   { href: "/admin/logs", label: "Activity Logs", icon: ScrollText },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/support", label: "Support", icon: MessageSquare },
   { href: "/admin/settings", label: "Platform Settings", icon: Settings },
 ]
 
