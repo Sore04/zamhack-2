@@ -24,9 +24,8 @@ export async function createTeam(name: string) {
 
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: authData } = await supabase.auth.getUser()
+  const user = authData.user
 
   if (!user) {
     return { error: "You must be logged in to create a team" }
@@ -83,9 +82,8 @@ export async function joinTeam(code: string) {
 
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: authData } = await supabase.auth.getUser()
+  const user = authData.user
 
   if (!user) {
     return { error: "You must be logged in to join a team" }
