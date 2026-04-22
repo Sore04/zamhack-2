@@ -44,7 +44,7 @@ export async function createTeam(name: string) {
   const joinCode = generateJoinCode()
   const teamData: TeamInsert = {
     name,
-    leader_id: user.id,
+    leader_id: user!.id,
     join_code: joinCode,
   }
 
@@ -60,7 +60,7 @@ export async function createTeam(name: string) {
 
   const memberData: TeamMemberInsert = {
     team_id: newTeam.id,
-    profile_id: user.id,
+    profile_id: user!.id,
     joined_at: new Date().toISOString(),
   }
 
@@ -120,7 +120,7 @@ export async function joinTeam(code: string) {
 
   const memberData: TeamMemberInsert = {
     team_id: team.id,
-    profile_id: user.id,
+    profile_id: user!.id,
     joined_at: new Date().toISOString(),
   }
 
