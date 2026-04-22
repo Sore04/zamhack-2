@@ -59,7 +59,7 @@ export async function createTeam(name: string) {
   }
 
   const memberData: TeamMemberInsert = {
-    team_id: newTeam.id,
+    team_id: newTeam!.id,
     profile_id: user!.id,
     joined_at: new Date().toISOString(),
   }
@@ -69,7 +69,7 @@ export async function createTeam(name: string) {
     .insert(memberData)
 
   if (memberError) {
-    await supabase.from("teams").delete().eq("id", newTeam.id)
+    await supabase.from("teams").delete().eq("id", newTeam!.id)
     return { error: "Failed to join created team" }
   }
 
