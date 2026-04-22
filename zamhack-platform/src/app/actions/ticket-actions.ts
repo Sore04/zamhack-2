@@ -24,7 +24,7 @@ export async function createTicket(formData: FormData) {
   // 1. Create conversation
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
-    .insert({ type: "support", source: "student" } as any)
+    .insert({ type: "support", source: "student" })
     .select("id")
     .single()
 

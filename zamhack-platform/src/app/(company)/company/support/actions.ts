@@ -24,7 +24,7 @@ export async function submitSupportRequest(formData: FormData) {
   // 1. Create a new support conversation
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
-    .insert({ type: "support", source: "company" } as any)
+    .insert({ type: "support", source: "company" })
     .select("id")
     .single()
 
