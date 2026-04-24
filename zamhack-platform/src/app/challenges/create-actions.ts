@@ -1,9 +1,17 @@
 "use server"
 
 import { createClient } from "@/utils/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import { Database } from "@/types/supabase"
 import { logActivity, ActivityAction, EntityType } from "@/lib/activity-log"
+
+function getAdminSupabase() {
+  return createAdminClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 type ChallengeStatus = Database["public"]["Enums"]["challenge_status"]
 type ProficiencyLevel = Database["public"]["Enums"]["proficiency_level"]
@@ -57,7 +65,8 @@ interface CreateChallengeInput {
 }
 
 export const createChallenge = async (
-  input: CreateChallengeInput
+  input: CreateChallengeInput,
+  bannerFormData: FormData | null = null
 ): Promise<{ success: boolean; challengeId?: string; error?: string }> => {
   const supabase = await createClient()
 
@@ -166,6 +175,28 @@ export const createChallenge = async (
     }
 
     const challengeId = challenge.id
+
+    // Upload banner image if provided
+    if (bannerFormData) {
+      const bannerFile = bannerFormData.get("banner")
+      if (bannerFile instanceof File && bannerFile.size > 0) {
+        const adminSupabase = getAdminSupabase()
+        const bytes = await bannerFile.arrayBuffer()
+        await adminSupabase.storage
+          .from("challenge-banners")
+          .upload(`challenge-${challengeId}/banner`, bytes, {
+            contentType: bannerFile.type,
+            upsert: true,
+          })
+        const { data: { publicUrl } } = adminSupabase.storage
+          .from("challenge-banners")
+          .getPublicUrl(`challenge-${challengeId}/banner`)
+        await adminSupabase
+          .from("challenges")
+          .update({ banner_image: publicUrl } as any)
+          .eq("id", challengeId)
+      }
+    }
 
     // Step 3: Insert milestones
     for (const milestone of input.milestones) {

@@ -501,6 +501,19 @@ export default async function ChallengeManagementPage({
 
   return (
     <div className="space-y-6 p-6">
+      {/* Banner */}
+      {(challenge as any).banner_image ? (
+        <div className="w-full h-48 md:h-64 overflow-hidden rounded-xl">
+          <img
+            src={(challenge as any).banner_image}
+            alt="Challenge banner"
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : (
+        <div className="w-full h-48 md:h-64 rounded-xl bg-gradient-to-br from-[#E8826A] to-[#F4A58A]" />
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-start">
         <div className="space-y-2">

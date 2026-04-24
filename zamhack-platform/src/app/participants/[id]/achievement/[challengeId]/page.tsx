@@ -87,6 +87,21 @@ export default async function CertificateVerifyPage({
       signatureUrl = signedData?.signedUrl ?? null
     }
 
+    let logoDataUrl: string | null = null
+    if (org?.logo_url) {
+      try {
+        const res = await fetch(org.logo_url)
+        if (res.ok) {
+          const buffer = await res.arrayBuffer()
+          const contentType = res.headers.get("content-type") ?? "image/png"
+          const base64 = Buffer.from(buffer).toString("base64")
+          logoDataUrl = `data:${contentType};base64,${base64}`
+        }
+      } catch {
+        // silently fall back to null — logo just won't show
+      }
+    }
+
     const completionDate = winner.announced_at
       ? new Date(winner.announced_at).toLocaleDateString("en-US", {
           year: "numeric",
@@ -118,7 +133,7 @@ export default async function CertificateVerifyPage({
           representativeName={org?.representative_name ?? null}
           signatureUrl={signatureUrl}
           verifyUrl={verifyUrl}
-          organizationLogoUrl={(org as any)?.logo_url ?? null}
+          organizationLogoUrl={logoDataUrl}
         />
       </VerifyPageShell>
     )
@@ -178,6 +193,21 @@ export default async function CertificateVerifyPage({
     signatureUrl = signedData?.signedUrl ?? null
   }
 
+  let logoDataUrl: string | null = null
+  if (org?.logo_url) {
+    try {
+      const res = await fetch(org.logo_url)
+      if (res.ok) {
+        const buffer = await res.arrayBuffer()
+        const contentType = res.headers.get("content-type") ?? "image/png"
+        const base64 = Buffer.from(buffer).toString("base64")
+        logoDataUrl = `data:${contentType};base64,${base64}`
+      }
+    } catch {
+      // silently fall back to null — logo just won't show
+    }
+  }
+
   // Use the latest submission date as completion date
   const latestSubmission = (submissions ?? [])
     .map((s) => s.submitted_at)
@@ -211,7 +241,7 @@ export default async function CertificateVerifyPage({
         representativeName={org?.representative_name ?? null}
         signatureUrl={signatureUrl}
         verifyUrl={verifyUrl}
-        organizationLogoUrl={(org as any)?.logo_url ?? null}
+        organizationLogoUrl={logoDataUrl}
       />
     </VerifyPageShell>
   )

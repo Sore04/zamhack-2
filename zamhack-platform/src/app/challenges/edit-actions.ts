@@ -2,9 +2,17 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
-import { type Enums } from "@/types/supabase";
+import { type Enums, Database } from "@/types/supabase";
 import { logActivity, ActivityAction, EntityType } from "@/lib/activity-log";
+
+function getAdminSupabase() {
+  return createAdminClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 export type MilestoneInput = {
   id?: string;
@@ -52,7 +60,8 @@ export type UpdateChallengeResult =
 
 export async function updateChallenge(
   challengeId: string,
-  data: UpdateChallengeInput
+  data: UpdateChallengeInput,
+  bannerFormData: FormData | null = null
 ): Promise<UpdateChallengeResult> {
   const supabase = await createClient();
 
@@ -107,6 +116,28 @@ export async function updateChallenge(
       .eq("created_by", user.id);
 
     if (challengeError) throw new Error(challengeError.message);
+
+    // Upload banner image if provided
+    if (bannerFormData) {
+      const bannerFile = bannerFormData.get("banner");
+      if (bannerFile instanceof File && bannerFile.size > 0) {
+        const adminSupabase = getAdminSupabase();
+        const bytes = await bannerFile.arrayBuffer();
+        await adminSupabase.storage
+          .from("challenge-banners")
+          .upload(`challenge-${challengeId}/banner`, bytes, {
+            contentType: bannerFile.type,
+            upsert: true,
+          });
+        const { data: { publicUrl } } = adminSupabase.storage
+          .from("challenge-banners")
+          .getPublicUrl(`challenge-${challengeId}/banner`);
+        await adminSupabase
+          .from("challenges")
+          .update({ banner_image: publicUrl } as any)
+          .eq("id", challengeId);
+      }
+    }
 
     for (const milestone of data.milestones) {
       if (!milestone.requires_github && !milestone.requires_url && !milestone.requires_text) {

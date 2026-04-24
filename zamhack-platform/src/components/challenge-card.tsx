@@ -170,6 +170,19 @@ export function ChallengeCard({ challenge, perpetualResultsHref, isParticipant, 
   return (
     <article className={`cc-card${isInactive || isPerpetualCompleted ? " cc-card-inactive" : ""}`}>
 
+      {/* ── Banner image or gradient fallback ── */}
+      {(challenge as any).banner_image ? (
+        <div className="w-full aspect-[3/1] overflow-hidden rounded-t-lg">
+          <img
+            src={(challenge as any).banner_image}
+            alt="Challenge banner"
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : (
+        <div className="w-full aspect-[3/1] rounded-t-lg bg-gradient-to-br from-[#E8826A] to-[#F4A58A]" />
+      )}
+
       {/* ── Coloured top stripe ── */}
       <div className={`cc-stripe ${accentClass}`} />
 

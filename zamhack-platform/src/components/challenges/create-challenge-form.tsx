@@ -159,6 +159,8 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
   const [currentStep, setCurrentStep] = useState(1)
   const [skillsInput, setSkillsInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null)
   const router = useRouter()
 
   const form = useForm<FormValues>({
@@ -292,6 +294,8 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
     if (currentStep !== STEPS.length) return
     setIsSubmitting(true)
     try {
+      const bannerFormData = bannerFile ? new FormData() : null
+      if (bannerFormData && bannerFile) bannerFormData.append("banner", bannerFile)
       const result = await createChallenge({
         ...data,
         // Pass both for backward compatibility
@@ -314,7 +318,7 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
           dueDate: m.dueDate?.toISOString() ?? null,
         })),
         organizationId,
-      })
+      }, bannerFormData)
       if (result.success) {
         toast.success("Challenge created successfully!")
         router.push(`/company/challenges/${result.challengeId}`)
@@ -398,6 +402,43 @@ export const CreateChallengeForm = ({ organizationId }: { organizationId: string
                     rows={5}
                   />
                   {form.formState.errors.description && <p className="text-xs text-destructive">{form.formState.errors.description.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Challenge Banner Image</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Recommended: 1200×400px. JPG, PNG or WebP.
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    aria-label="Challenge banner image upload"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      setBannerFile(file)
+                      const reader = new FileReader()
+                      reader.onload = (ev) => setBannerPreview(ev.target?.result as string)
+                      reader.readAsDataURL(file)
+                    }}
+                    className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+                  />
+                  {bannerPreview && (
+                    <div className="relative mt-2 rounded-lg overflow-hidden aspect-[3/1] w-full">
+                      <img
+                        src={bannerPreview}
+                        alt="Banner preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setBannerFile(null); setBannerPreview(null) }}
+                        className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* ── MULTI-INDUSTRY CHECKBOXES ── */}

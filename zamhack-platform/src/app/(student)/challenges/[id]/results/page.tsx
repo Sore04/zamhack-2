@@ -159,6 +159,23 @@ export default async function ChallengeResultsPage({
       .createSignedUrl(rawSignaturePath, 300)
     signatureUrl = signedData?.signedUrl ?? null
   }
+
+  // Convert logo to base64 data URL server-side — avoids CORS blocking in iframe PDF capture
+  let logoDataUrl: string | null = null
+  const rawLogoUrl = (orgData as any)?.logo_url ?? null
+  if (rawLogoUrl) {
+    try {
+      const res = await fetch(rawLogoUrl)
+      if (res.ok) {
+        const buffer = await res.arrayBuffer()
+        const contentType = res.headers.get("content-type") ?? "image/png"
+        const base64 = Buffer.from(buffer).toString("base64")
+        logoDataUrl = `data:${contentType};base64,${base64}`
+      }
+    } catch {
+      // silently fall back to null — logo just won't show
+    }
+  }
   const awardDate = new Date().toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric",
   })
@@ -249,7 +266,7 @@ export default async function ChallengeResultsPage({
               representativeName={representativeName}
               signatureUrl={signatureUrl}
               verifyUrl={verifyUrl}
-              organizationLogoUrl={(orgData as any)?.logo_url ?? null}
+              organizationLogoUrl={logoDataUrl}
             />
           )}
         </div>

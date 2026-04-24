@@ -319,6 +319,19 @@ export default async function ChallengePage({
 
   return (
     <div className="container py-8 space-y-8">
+      {/* --- BANNER --- */}
+      {challenge.banner_image ? (
+        <div className="w-full h-48 md:h-64 overflow-hidden rounded-xl mb-6">
+          <img
+            src={challenge.banner_image}
+            alt="Challenge banner"
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : (
+        <div className="w-full h-48 md:h-64 rounded-xl mb-6 bg-gradient-to-br from-[#E8826A] to-[#F4A58A]" />
+      )}
+
       {/* --- HEADER --- */}
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-4">

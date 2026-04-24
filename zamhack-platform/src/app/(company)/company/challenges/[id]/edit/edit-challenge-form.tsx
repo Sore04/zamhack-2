@@ -25,6 +25,10 @@ export default function EditChallengeForm({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(
+    challenge.banner_image ?? null
+  );
 
   // Basic fields
   const [title, setTitle] = useState<string>(challenge.title ?? "");
@@ -189,6 +193,8 @@ export default function EditChallengeForm({
     }
 
     try {
+      const bannerFormData = bannerFile ? new FormData() : null;
+      if (bannerFormData && bannerFile) bannerFormData.append("banner", bannerFile);
       const result = await updateChallenge(challenge.id, {
         title,
         description,
@@ -210,7 +216,7 @@ export default function EditChallengeForm({
         location_details: locationType === "onsite" ? locationDetails : null,
         scoring_mode: scoringMode,
         milestones,
-      });
+      }, bannerFormData);
 
       if (result.type === "resubmitted") {
         toast.success("Challenge resubmitted for review");
@@ -266,6 +272,39 @@ export default function EditChallengeForm({
             value={problemBrief}
             onChange={(e) => setProblemBrief(e.target.value)}
           />
+        </Field>
+
+        <Field label="Challenge Banner Image">
+          <p className="text-xs text-gray-500 mb-1">Recommended: 1200×400px. JPG, PNG or WebP.</p>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setBannerFile(file);
+              const reader = new FileReader();
+              reader.onload = (ev) => setBannerPreview(ev.target?.result as string);
+              reader.readAsDataURL(file);
+            }}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-orange-500 file:text-white hover:file:bg-orange-600 cursor-pointer"
+          />
+          {bannerPreview && (
+            <div className="relative mt-2 rounded-lg overflow-hidden aspect-[3/1] w-full">
+              <img
+                src={bannerPreview}
+                alt="Banner preview"
+                className="w-full h-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => { setBannerFile(null); setBannerPreview(null); }}
+                className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
