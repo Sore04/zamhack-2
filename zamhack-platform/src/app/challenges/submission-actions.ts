@@ -108,7 +108,7 @@ export async function submitMilestone(formData: FormData) {
     .single() as any)
 
   if (milestone?.challenge_id) {
-    revalidatePath(`/my-challenges/${milestone.challenge_id}`)
+    revalidatePath(`/my-challenges`)
     revalidatePath(`/challenges/${milestone.challenge_id}`)
   }
 
@@ -149,6 +149,14 @@ export async function submitMilestone(formData: FormData) {
       .in("milestone_id", milestoneIds?.map((m) => m.id) ?? [])
 
     if (submittedCount === totalMilestones && totalMilestones !== null && totalMilestones > 0) {
+      // Mark as completed so the active slot is freed immediately
+      await supabase
+        .from("challenge_participants")
+        .update({ status: "completed" })
+        .eq("id", participantId)
+
+      revalidatePath("/dashboard")
+
       const challengeScoringMode = ((milestone?.challenges as any)?.scoring_mode ?? "company_only") as ScoringMode
 
       // Award skill tags — unchanged, do not remove

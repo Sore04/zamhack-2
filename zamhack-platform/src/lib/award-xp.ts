@@ -76,7 +76,12 @@ export async function awardXp(
   })()
 
   const rankMultiplier = MULTIPLIER[currentRank]?.[challengeDifficulty] ?? 1.0
-  let xpDelta = Math.round(baseXp * rankMultiplier * xpMultiplier)
+  let xpDelta: number
+  if (baseXp < 0) {
+    xpDelta = baseXp
+  } else {
+    xpDelta = Math.round(baseXp * rankMultiplier * xpMultiplier)
+  }
 
   // Penalty only applies to Advanced rank students.
   // Beginner and Intermediate: clamp any negative delta to 0.

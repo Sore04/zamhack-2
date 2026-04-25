@@ -107,7 +107,9 @@ for (const participation of allParticipations) {
     const isStatusPast = PAST_CHALLENGE_STATUSES.includes(challenge.status as string)
     const isEnded = challenge.end_date ? new Date(challenge.end_date) < new Date() : false
 
-    if (isStatusPast || (isPerpetual && isCompleted) || isEnded ) {
+    const participantDone = participation.status === "completed"
+
+    if (isStatusPast || (isPerpetual && (isCompleted || participantDone)) || isEnded) {
       pastChallenges.push(challenge)
     } else {
       activeChallenges.push(challenge)
