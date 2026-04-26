@@ -43,6 +43,7 @@ interface ChallengeProgressData {
   submissions: Submission[]
   evaluations: Evaluation[]
   rubrics: Rubric[]
+  hasMaxSlots: boolean
   userId: string
   studentName: string
   gateStatus: GateResult
@@ -170,12 +171,40 @@ async function getChallengeData(
   }
   const verifyUrl = `zamhack.vercel.app/participants/${user.id}/achievement/${id}?type=completion`
 
+  // 11. Slot limit check
+  const { data: profileSlots } = await supabase
+    .from("profiles")
+    .select("max_active_challenges")
+    .eq("id", user.id)
+    .single()
+
+  const maxSlots = profileSlots?.max_active_challenges ?? 3
+
+  const { data: activeParticipations } = await supabase
+    .from("challenge_participants")
+    .select("id, challenge_id, challenges(status, end_date)")
+    .eq("user_id", user.id)
+    .neq("status", "completed") as any
+
+  const now = new Date().toISOString()
+  const activeSlotCount = (activeParticipations ?? []).filter((p: any) => {
+    const c = p.challenges
+    return (
+      c &&
+      ["approved", "in_progress"].includes(c.status) &&
+      (!c.end_date || c.end_date > now)
+    )
+  }).length
+
+  const hasMaxSlots = !participant && activeSlotCount >= maxSlots
+
   return {
     challenge: challenge as any,
     milestones: milestones || [],
     participant,
     submissions,
     evaluations,
+    hasMaxSlots,
     rubrics: rubrics || [],
     userId: user.id,
     studentName,
@@ -239,6 +268,7 @@ export default async function ChallengePage({
     participant,
     submissions,
     evaluations,
+    hasMaxSlots,
     rubrics,
     userId,
     studentName,
@@ -316,7 +346,7 @@ export default async function ChallengePage({
     totalMilestones > 0 && completedCount === totalMilestones
 
   const showCertificate = isPerpetual && hasJoined && allMilestonesCompleted
-
+  
   return (
     <div className="container py-8 space-y-8">
       {/* --- BANNER --- */}
@@ -490,28 +520,31 @@ export default async function ChallengePage({
                     <Lock className="mr-2 h-4 w-4" />
                     Registration Closed
                   </Button>
-                ) : hasEntryFee ? (
-                  /* CASE 6: Paid entry */
-                  <Button
-                    asChild
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold shadow-md"
-                    size="lg"
-                  >
-                    <Link href={`/challenges/${challenge.id}/payment`}>
-                      Join for {currency} {feeAmount}
-                    </Link>
-                  </Button>
+
+                ) : hasMaxSlots ? (
+                  /* CASE 0: Max active challenge slots reached — blocks paid & free */
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center space-y-1">
+                    <div className="flex items-center justify-center gap-2 font-semibold text-sm text-red-700">
+                      <Lock size={14} />
+                      You've reached your challenge limit
+                    </div>
+                    <p className="text-xs text-red-500">
+                      Complete or wait for an active challenge to end before joining another.
+                    </p>
+                  </div>
+
                 ) : !gateStatus.allowed && gateStatus.reason === "advanced_limit" ? (
-                  /* CASE 7a: Advanced weekly limit reached */
-                  <Button disabled size="lg" variant="outline" className="w-full gap-2 flex-col h-auto py-3">
-                    <span className="flex items-center gap-2">
-                      <Lock size={16} />
-                      Weekly limit reached
-                    </span>
-                    <span className="text-xs font-normal opacity-70">
+                  /* CASE 7a: Advanced guardrail — blocks paid & free */
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center space-y-1">
+                    <div className="flex items-center justify-center gap-2 font-semibold text-sm text-red-700">
+                      <Lock size={14} />
+                      You're too advanced for this challenge
+                    </div>
+                    <p className="text-xs text-red-500">
                       Next eligible: {new Date(gateStatus.nextEligibleAt).toLocaleDateString()}
-                    </span>
-                  </Button>
+                    </p>
+                  </div>
+
                 ) : !gateStatus.allowed && gateStatus.reason === "xp_rank_gate" ? (
                   /* CASE 7b: XP rank gate locked */
                   <Button asChild size="lg" variant="outline" className="w-full gap-2">
@@ -539,6 +572,17 @@ export default async function ChallengePage({
                     >
                       <Lock size={16} />
                       Requires {(gateStatus as any).requiredTier} credential
+                    </Link>
+                  </Button>
+                ) : hasEntryFee ? (
+                  /* CASE 6: Paid entry — only reached if all gates passed */
+                  <Button
+                    asChild
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold shadow-md"
+                    size="lg"
+                  >
+                    <Link href={`/challenges/${challenge.id}/payment`}>
+                      Join for {currency} {feeAmount}
                     </Link>
                   </Button>
                 ) : (
