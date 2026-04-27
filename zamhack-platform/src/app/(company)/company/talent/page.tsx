@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server"
 import { redirect } from "next/navigation"
 import { Database } from "@/types/supabase"
-import { Users } from "lucide-react"
+import { Users, Trophy, Activity, UserCheck } from "lucide-react"
 import { TalentGrid } from "./talent-grid"
 import { type SkillTier } from "@/lib/rank-titles"
 
@@ -204,20 +204,23 @@ export default async function TalentPage() {
       </div>
 
       <div className="cp-grid-4">
-        <div className="cp-stat-card">
+        <div className="cp-stat-card indigo">
           <div className="cp-stat-icon"><Users className="w-5 h-5" /></div>
           <p className="cp-stat-value">{students.length}</p>
           <p className="cp-stat-label">Total Students</p>
         </div>
         <div className="cp-stat-card primary">
+          <div className="cp-stat-icon"><Trophy className="w-5 h-5" /></div>
           <p className="cp-stat-value">{students.filter((s) => s.completedChallenges > 0).length}</p>
           <p className="cp-stat-label">With Experience</p>
         </div>
-        <div className="cp-stat-card">
+        <div className="cp-stat-card emerald">
+          <div className="cp-stat-icon"><Activity className="w-5 h-5" /></div>
           <p className="cp-stat-value">{students.filter((s) => s.activeChallenges > 0).length}</p>
           <p className="cp-stat-label">Currently Active</p>
         </div>
         <div className="cp-stat-card navy">
+          <div className="cp-stat-icon"><UserCheck className="w-5 h-5" /></div>
           <p className="cp-stat-value">{students.filter((s) => s.bio).length}</p>
           <p className="cp-stat-label">Full Profiles</p>
         </div>

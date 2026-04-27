@@ -6,6 +6,7 @@ import {
   Users,
   Trophy,
   CalendarDays,
+  CalendarCheck,
   Zap,
   ArrowRight,
   Lock,
@@ -97,6 +98,24 @@ function formatDeadline(dateStr: string | null): { label: string; urgent: boolea
   }
 }
 
+function formatRegistrationDeadline(dateStr: string | null): {
+  label: string
+  status: "open" | "urgent" | "closed"
+} {
+  if (!dateStr) return { label: "", status: "open" }
+  const diff = Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000)
+  if (diff < 0)  return { label: "Registration closed",      status: "closed" }
+  if (diff === 0) return { label: "Reg. closes today",        status: "urgent" }
+  if (diff === 1) return { label: "Reg. closes in 1 day",     status: "urgent" }
+  if (diff <= 7)  return { label: `Reg. closes in ${diff} days`, status: "urgent" }
+  return {
+    label: `Reg. open until ${new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
+    })}`,
+    status: "open",
+  }
+}
+
 function orgAccentClass(name: string | undefined | null): string {
   const palette = [
     "cc-accent-coral",
@@ -124,6 +143,9 @@ export function ChallengeCard({ challenge, perpetualResultsHref, isParticipant, 
   const deadline    = (isClosed || isCancelled)
     ? { label: "Ended", urgent: false }
     : formatDeadline(challenge.end_date)
+  const regDeadline = !isInactive
+    ? formatRegistrationDeadline((challenge as any).registration_deadline ?? null)
+    : null
   const accentClass = orgAccentClass(challenge.organization?.name)
 
   // For closed non-perpetual challenges, link directly to the official results/leaderboard
@@ -232,6 +254,13 @@ export function ChallengeCard({ challenge, perpetualResultsHref, isParticipant, 
           <CalendarDays size={13} />
           <span>{isPerpetual ? "No deadline" : deadline.label}</span>
         </div>
+
+        {regDeadline && regDeadline.label && (
+          <div className={`cc-meta-item${regDeadline.status === "urgent" ? " cc-urgent" : ""}${regDeadline.status === "closed" ? " cc-reg-closed" : ""}`}>
+            <CalendarCheck size={13} />
+            <span>{regDeadline.label}</span>
+          </div>
+        )}
 
         {xpRange && (
           <div className="cc-meta-item" style={isInactive ? { opacity: 0.5 } : undefined}>

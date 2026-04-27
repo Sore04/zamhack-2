@@ -311,6 +311,13 @@ export default async function ChallengeProgressPage({
         </CardContent>
       </Card>
 
+      {challenge.description && (
+        <div className="prose max-w-none">
+          <h3 className="text-lg font-semibold">About this Challenge</h3>
+          <p className="text-muted-foreground whitespace-pre-wrap">{challenge.description}</p>
+        </div>
+      )}
+      
       {/* Milestones Feed */}
       <div className="space-y-4">
         <h2 className="text-2xl font-semibold tracking-tight">Milestones</h2>

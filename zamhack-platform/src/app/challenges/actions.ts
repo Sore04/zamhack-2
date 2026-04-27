@@ -74,27 +74,72 @@ export async function joinChallenge(challengeId: string, teamId?: string, forceJ
 
     const maxSlots = profileSlots?.max_active_challenges ?? 3
 
-    // Count participations where the joined challenge is still active
-    const { data: activeParts } = await supabase
-  .from("challenge_participants")
-  .select("challenge_id")
-  .eq("user_id", user.id)
+    // Count participations where the joined challenge is still active.
+    // Exclude participants already marked completed and perpetual challenges
+    // where the student has submitted all milestones (handles pre-fix rows too).
+    const { data: rawParts } = await supabase
+      .from("challenge_participants")
+      .select("id, challenge_id, status")
+      .eq("user_id", user.id)
+      .neq("status", "completed")
 
-    const activePartChallengeIds = (activeParts ?? [])
+    const rawChallengeIds = (rawParts ?? [])
       .map((p) => p.challenge_id)
       .filter(Boolean) as string[]
 
     let activeSlotCount = 0
-    if (activePartChallengeIds.length > 0) {
-      const now = new Date().toISOString()
-      const { count } = await supabase
+    if (rawChallengeIds.length > 0) {
+      const nowStr = new Date().toISOString()
+      const { data: runningChallenges } = await (supabase
         .from("challenges")
-        .select("id", { count: "exact", head: true })
-        .in("id", activePartChallengeIds)
+        .select("id, is_perpetual")
+        .in("id", rawChallengeIds)
         .in("status", ["approved", "in_progress"])
-        .or(`end_date.is.null,end_date.gt.${now}`)
+        .or(`end_date.is.null,end_date.gt.${nowStr}`) as any)
 
-      activeSlotCount = count ?? 0
+      const perpetualIds = new Set<string>(
+        (runningChallenges ?? [])
+          .filter((c: any) => c.is_perpetual === true)
+          .map((c: any) => c.id as string)
+      )
+      // Non-perpetual running challenges always consume a slot
+      activeSlotCount += (runningChallenges ?? []).filter((c: any) => !c.is_perpetual).length
+
+      if (perpetualIds.size > 0) {
+        const perpetualParts = (rawParts ?? []).filter(
+          (p) => p.challenge_id && perpetualIds.has(p.challenge_id)
+        )
+        const perpetualPartIds = perpetualParts.map((p) => p.id)
+
+        const { data: milestones } = await supabase
+          .from("milestones")
+          .select("id, challenge_id")
+          .in("challenge_id", [...perpetualIds])
+
+        const { data: submissions } = await supabase
+          .from("submissions")
+          .select("participant_id, milestone_id")
+          .in("participant_id", perpetualPartIds)
+
+        const milestoneCounts = new Map<string, number>()
+        for (const m of milestones ?? []) {
+          if (!m.challenge_id) continue
+          milestoneCounts.set(m.challenge_id, (milestoneCounts.get(m.challenge_id) ?? 0) + 1)
+        }
+        const submittedByPart = new Map<string, Set<string>>()
+        for (const s of submissions ?? []) {
+          if (!s.participant_id || !s.milestone_id) continue
+          if (!submittedByPart.has(s.participant_id)) submittedByPart.set(s.participant_id, new Set())
+          submittedByPart.get(s.participant_id)!.add(s.milestone_id)
+        }
+
+        for (const part of perpetualParts) {
+          const total = milestoneCounts.get(part.challenge_id!) ?? 0
+          const submitted = submittedByPart.get(part.id)?.size ?? 0
+          const done = total > 0 && submitted >= total
+          if (!done) activeSlotCount += 1
+        }
+      }
     }
  
     if (activeSlotCount >= maxSlots) {

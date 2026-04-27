@@ -91,52 +91,13 @@ async function getDashboardData(): Promise<DashboardData> {
   const activeStatuses = ["approved", "in_progress", "under_review"]
 
   const now = new Date()
-// Initial pass — same status/date logic as before
-  const potentiallyActive = allParticipations.filter((p) => {
+  const activeParts = allParticipations.filter((p) => {
     const challenge = p.challenges as any
+    if (p.status === "completed") return false
     if (!activeStatuses.includes(challenge?.status || "")) return false
-    // If end_date exists and has passed, treat as no longer active
     if (challenge?.end_date && new Date(challenge.end_date) < now) return false
     return true
   })
-
-  // For perpetual challenges, exclude those where all milestones are already submitted
-  const perpetualParts = potentiallyActive.filter(
-    (p) => (p.challenges as any)?.is_perpetual === true
-  )
-
-  const completedPerpetualIds = new Set<string>() // participant record IDs
-
-  if (perpetualParts.length > 0) {
-    const perpetualChallengeIds = perpetualParts
-      .map((p) => (p.challenges as any)?.id)
-      .filter(Boolean)
-    const perpetualParticipantIds = perpetualParts.map((p) => p.id)
-
-    const { data: perpetualMilestones } = await supabase
-      .from("milestones")
-      .select("id, challenge_id")
-      .in("challenge_id", perpetualChallengeIds)
-
-    const { data: perpetualSubmissions } = await supabase
-      .from("submissions")
-      .select("milestone_id, participant_id")
-      .in("participant_id", perpetualParticipantIds)
-
-    const submittedKey = new Set(
-      (perpetualSubmissions || []).map((s) => `${s.participant_id}:${s.milestone_id}`)
-    )
-
-    for (const part of perpetualParts) {
-      const challengeId = (part.challenges as any)?.id
-      const ms = (perpetualMilestones || []).filter((m) => m.challenge_id === challengeId)
-      if (ms.length > 0 && ms.every((m) => submittedKey.has(`${part.id}:${m.id}`))) {
-        completedPerpetualIds.add(part.id)
-      }
-    }
-  }
-
-  const activeParts = potentiallyActive.filter((p) => !completedPerpetualIds.has(p.id))
 
   const completedParts = allParticipations.filter((p) =>
     ["completed", "closed"].includes((p.challenges as any)?.status || "")
@@ -144,7 +105,8 @@ async function getDashboardData(): Promise<DashboardData> {
 
   const slotsUsed = activeParts.length
   const activeChallengesCount = activeParts.length
-  const completedChallengesCount = completedParts.length + completedPerpetualIds.size
+  const completedChallengesCount =
+    completedParts.length + allParticipations.filter((p) => p.status === "completed").length
 
   const { count: skillsCount } = await supabase
     .from("student_skills")

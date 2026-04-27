@@ -332,6 +332,38 @@ aside > div {
   color: var(--cp-white);
 }
 
+/* Indigo variant */
+.cp-stat-card.indigo {
+  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  border: none;
+}
+
+.cp-stat-card.indigo .cp-stat-value,
+.cp-stat-card.indigo .cp-stat-label {
+  color: var(--cp-white);
+}
+
+.cp-stat-card.indigo .cp-stat-icon {
+  background: rgba(255, 255, 255, 0.20);
+  color: var(--cp-white);
+}
+
+/* Emerald variant */
+.cp-stat-card.emerald {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  border: none;
+}
+
+.cp-stat-card.emerald .cp-stat-value,
+.cp-stat-card.emerald .cp-stat-label {
+  color: var(--cp-white);
+}
+
+.cp-stat-card.emerald .cp-stat-icon {
+  background: rgba(255, 255, 255, 0.20);
+  color: var(--cp-white);
+}
+
 
 /* =============================================
    SECTION CARDS / CONTENT CARDS

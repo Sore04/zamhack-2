@@ -32,7 +32,16 @@ export function CompanyUnreadBadge() {
       .select("conversation_id")
       .eq("profile_id", user.id)
 
-    const ids = (participations ?? []).map((p) => p.conversation_id)
+    const allIds = (participations ?? []).map((p) => p.conversation_id)
+    if (allIds.length === 0) { setCount(0); return }
+
+    const { data: directConvs } = await supabase
+      .from("conversations")
+      .select("id")
+      .in("id", allIds)
+      .eq("type", "direct")
+
+    const ids = (directConvs ?? []).map((c) => c.id)
     if (ids.length === 0) { setCount(0); return }
 
     const { data: unread } = await supabase

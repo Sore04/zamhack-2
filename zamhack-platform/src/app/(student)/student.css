@@ -690,6 +690,11 @@
   font-weight: 700;
 }
 
+.student-portal .cc-reg-closed {
+  color: #9ca3af;
+  font-style: italic;
+}
+
 /* ── Participation type pill ── */
 .student-portal .cc-pills {
   padding: 0.5rem 1.125rem 0;

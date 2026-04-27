@@ -39,8 +39,11 @@ export default async function CompanyMessagesPage({
       `)
       .in("id", conversationIds)
       .eq("type", "direct")
-      .order("created_at", { ascending: false })
-    conversations = data ?? []
+    conversations = (data ?? []).sort((a, b) => {
+      const aLast = (a.messages as any[])?.reduce((max: string, m: any) => m.created_at > max ? m.created_at : max, "") ?? ""
+      const bLast = (b.messages as any[])?.reduce((max: string, m: any) => m.created_at > max ? m.created_at : max, "") ?? ""
+      return bLast.localeCompare(aLast)
+    })
   }
 
   // Mark active conversation as read server-side (service role bypasses RLS)

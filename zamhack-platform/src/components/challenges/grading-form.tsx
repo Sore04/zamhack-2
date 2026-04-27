@@ -77,7 +77,8 @@ function SimpleGradingForm({
   challengeId?: string
 }) {
   const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeAction, setActiveAction] = useState<'draft' | 'submit' | null>(null)
+  const isSubmitting = activeAction !== null
   const [readOnly, setReadOnly] = useState(initialReadOnly ?? false)
   const isSubmittingRef = useRef(false)
 
@@ -92,8 +93,7 @@ function SimpleGradingForm({
 
   const onSubmit = async (data: SimpleGradingFormValues, isDraftOverride?: boolean) => {
     if (isSubmittingRef.current) return
-    isSubmittingRef.current = true
-    setIsSubmitting(true)
+    setActiveAction(isDraftOverride ? 'draft' : 'submit')
     try {
       const finalIsDraft = isDraftOverride !== undefined ? isDraftOverride : data.isDraft
 
@@ -126,7 +126,7 @@ function SimpleGradingForm({
       toast.error("An unexpected error occurred")
     } finally {
       isSubmittingRef.current = false
-      setIsSubmitting(false)
+      setActiveAction(null)
     }
   }
 
@@ -227,7 +227,7 @@ function SimpleGradingForm({
           onClick={() => form.handleSubmit((data) => onSubmit(data, true))()}
           className="flex-1"
         >
-          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {activeAction === 'draft' ?<Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Save Draft
         </Button>
         <Button
@@ -236,7 +236,7 @@ function SimpleGradingForm({
           onClick={() => form.handleSubmit((data) => onSubmit(data, false))()}
           className="flex-1"
         >
-          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {activeAction === 'submit' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Submit Evaluation
         </Button>
       </div>
@@ -254,7 +254,8 @@ export const GradingForm = ({
   challengeId,
 }: GradingFormProps) => {
   const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeAction, setActiveAction] = useState<'draft' | 'submit' | null>(null)
+  const isSubmitting = activeAction !== null
   const [readOnly, setReadOnly] = useState(initialReadOnly ?? false)
   const isSubmittingRef = useRef(false)
 
@@ -289,7 +290,7 @@ export const GradingForm = ({
   const onSubmit = async (data: GradingFormValues, isDraftOverride?: boolean) => {
     if (isSubmittingRef.current) return
     isSubmittingRef.current = true
-    setIsSubmitting(true)
+    setActiveAction(isDraftOverride ? 'draft' : 'submit')
     try {
       const finalIsDraft = isDraftOverride !== undefined ? isDraftOverride : data.isDraft
 
@@ -320,7 +321,7 @@ export const GradingForm = ({
       toast.error("An unexpected error occurred")
     } finally {
       isSubmittingRef.current = false
-      setIsSubmitting(false)
+      setActiveAction(null)
     }
   }
 
@@ -467,7 +468,7 @@ export const GradingForm = ({
                 onClick={() => form.handleSubmit((data) => onSubmit(data, true))()}
                 className="flex-1"
               >
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {activeAction === 'draft' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save Draft
               </Button>
               <Button
@@ -476,7 +477,7 @@ export const GradingForm = ({
                 onClick={() => form.handleSubmit((data) => onSubmit(data, false))()}
                 className="flex-1"
               >
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {activeAction === 'submit' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Submit Evaluation
               </Button>
             </div>
