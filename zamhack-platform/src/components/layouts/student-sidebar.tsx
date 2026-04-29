@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { Suspense } from "react"
 import {
   LayoutDashboard, Search, Briefcase, Users,
-  User, Settings, Zap, MessageCircle, HelpCircle, BookOpen,
+  User, Settings, Zap, MessageCircle, HelpCircle, BookOpen, CreditCard,
 } from "lucide-react"
 import { LogoutButton } from "@/components/logout-button"
 import { UnreadMessagesBadge } from "@/components/layouts/unread-badge"
@@ -13,8 +13,9 @@ import { UnreadMessagesBadge } from "@/components/layouts/unread-badge"
 const studentNavItems = [
   { href: "/dashboard",     label: "Dashboard",         icon: LayoutDashboard },
   { href: "/challenges",    label: "Browse Challenges", icon: Search },
-  { href: "/my-challenges", label: "My Challenges",     icon: Briefcase },
-  { href: "/team",          label: "My Team",           icon: Users,          comingSoon: true },
+  { href: "/my-challenges",       label: "My Challenges",     icon: Briefcase },
+  { href: "/dashboard/finances", label: "Finances",          icon: CreditCard },
+  { href: "/team",               label: "My Team",           icon: Users,          comingSoon: true },
   { href: "/messages",      label: "Messages",          icon: MessageCircle,  showBadge: true },
   { href: "/profile",       label: "Profile",           icon: User },
   { href: "/help",           label: "Help & FAQ",        icon: BookOpen },

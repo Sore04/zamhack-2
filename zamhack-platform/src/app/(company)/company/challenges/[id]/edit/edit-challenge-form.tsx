@@ -569,6 +569,19 @@ export default function EditChallengeForm({
             </select>
           </Field>
         </div>
+
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 space-y-1">
+          <p className="font-semibold">Entry Fee Policy</p>
+          <p>
+            ZamHack retains a <span className="font-semibold">15% platform fee</span> on
+            all student entry payments. The remaining 85% will be disbursed to your
+            organization within 7 days after the challenge registration period closes.
+          </p>
+          <p>
+            In the event of a challenge cancellation, refund eligibility will be
+            determined by ZamHack on a case-by-case basis.
+          </p>
+        </div>
       </section>
 
       {/* ── Milestones ── */}

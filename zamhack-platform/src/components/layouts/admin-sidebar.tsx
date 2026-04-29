@@ -13,6 +13,7 @@ import {
   MessageSquare,
   BookOpen,
   GraduationCap,
+  DollarSign,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LogoutButton } from "@/components/logout-button"
@@ -27,6 +28,7 @@ const adminNavItems = [
   { href: "/admin/universities", label: "Universities", icon: GraduationCap },
   { href: "/admin/logs", label: "Activity Logs", icon: ScrollText },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/finances", label: "Finances", icon: DollarSign },
   { href: "/admin/help",    label: "Help & FAQ", icon: BookOpen },
   { href: "/admin/support", label: "Support", icon: MessageSquare },
   { href: "/admin/settings", label: "Platform Settings", icon: Settings },

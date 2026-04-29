@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
               metadata: {
                 challenge_id: challengeId,
                 user_id: user.id,
+                payment_type: "student_entry",
               },
               description: `ZamHack registration fee for: ${challenge.title}`,
             },
@@ -182,6 +183,7 @@ export async function POST(req: NextRequest) {
           status: "pending",
           provider: "paymongo",
           checkout_session_id: sessionId,
+          payment_type: "student_entry",
         })
 
       if (insertError) {
